@@ -27,7 +27,7 @@ jobs:
           # 确保jar目录存在，不存在自动创建
           mkdir -p jar
           # 下载文件，-fL参数：失败时返回错误、跟随重定向
-          curl -fL -o jar/spider.jar https://raw.githubusercontent.com/bankan-lichaz/qist/refs/heads/master/jar/spider.jar
+          curl -fL -o jar/spider.jar https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/spider.jar
 
       # 第三步：配置Git提交信息（机器人提交，符合规范）
       - name: 配置Git用户信息
