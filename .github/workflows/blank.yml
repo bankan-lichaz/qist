@@ -1,76 +1,49 @@
-name: 自动更新 spider.jar
+# 工作流名称
+name: 自动更新spider.jar
 
-# 触发条件：支持手动触发，推送到master分支自动执行，同时每天定时执行
+# 触发条件：定时任务 + 手动触发
 on:
-  workflow_dispatch: # 手动触发按钮，可在GitHub Actions页面点击运行
-  push:
-    branches: [master] # 推送到master分支时自动执行，不需要可以删掉这行
   schedule:
-    # 定时触发配置，GitHub Actions 默认使用UTC时区
-    # 以下写法对应【北京时间0点（即24点）】执行：UTC时间 = 北京时间 - 8小时，因此北京时间24点对应UTC 16点
-    # 如果你需要其他时区的时间，自行换算UTC时间修改即可，比如要UTC时区0点执行就改成 '0 0 * * *'
-    - cron: '0 16 * * *'
+    # 每天UTC时间0点执行（对应北京时间早上8点，如需北京时间0点执行请修改为 '16 0 * * *'）
+    - cron: '0 0 * * *'
+  # 允许在Actions页面手动点击触发执行
+  workflow_dispatch:
 
-# 配置权限：需要写入仓库内容的权限才能提交到master分支
+# 授予工作流推送代码到仓库的权限
 permissions:
   contents: write
 
+# 执行任务
 jobs:
-  update-spider-jar:
-    runs-on: ubuntu-latest # 使用官方Ubuntu运行环境
-
+  update-spider:
+    # 运行环境
+    runs-on: ubuntu-latest
     steps:
-      # 第一步：检出你的仓库代码
-      - name: 检出仓库代码
+      # 1. 拉取master分支最新代码
+      - name: 拉取master分支代码
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }} # 默认自带仓库访问令牌，无需额外配置
-          fetch-depth: 0 # 拉取完整仓库历史，避免合并/变基时因历史不全出错，仓库很大可以改成2
+          ref: master
 
-      # 第二步：下载远程jar包到指定目录
-      - name: 下载最新spider.jar
+      # 2. 创建目录并下载spider.jar
+      - name: 下载spider.jar
         run: |
-          # 确保jar目录存在，不存在自动创建
-          mkdir -p jar
-          # 下载文件，-fL参数：失败时返回错误、跟随重定向
-          curl -fL -o jar/spider.jar https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/spider.jar
+          set -e # 命令执行失败立即退出
+          mkdir -p jar # 确保jar目录存在
+          curl -L -o jar/spider.jar https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/spider.jar
 
-      # 第三步：配置Git提交信息（机器人提交，符合规范）
+      # 3. 配置Git提交信息（使用官方机器人账号，不会计入个人提交贡献）
       - name: 配置Git用户信息
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # 第四步：同步远端代码、提交并推送更新
+      # 4. 仅当文件有变更时才提交推送，避免空提交
+      - name: 提交并推送更新
         run: |
-          # 1. 先备份本地刚下载的jar，避免拉取远端时被未跟踪文件冲突阻止
-          if [ -f jar/spider.jar ]; then
-            mv jar/spider.jar /tmp/spider.jar.bak
-          fi
-
-          # 2. 拉取远端master最新变更，合并时冲突自动保留本地版本（即最新jar）
-          git fetch origin master
-          git merge -X ours origin/master --no-edit || {
-            echo "合并出现异常，恢复本地jar"
-            # 合并失败时恢复备份的jar
-            [ -f /tmp/spider.jar.bak ] && mv /tmp/spider.jar.bak jar/spider.jar
-            exit 1
-          }
-
-          # 3. 合并完成后，把本地最新的jar移回目录，覆盖远端可能的旧版本
-          [ -f /tmp/spider.jar.bak ] && mv /tmp/spider.jar.bak jar/spider.jar
-
-          # 4. 暂存jar/spider.jar文件
-          git add jar/spider.jar
-
-          # 5. 检查是否有实际变更，避免空提交
-          if git diff --cached --quiet; then
-            echo "spider.jar无更新，跳过提交"
-            exit 0
-          fi
-
-          # 6. 提交变更，添加[skip ci]避免本次提交再次触发工作流，防止无限循环
-          git commit -m "chore: 自动更新spider.jar到最新版本 [skip ci]"
-
-          # 7. 推送到master分支，force-with-lease比force更安全，不会覆盖他人提交的其他代码
-          git push --force-with-lease origin HEAD:master
+          # 检查spider.jar是否有内容变更
+          git diff --quiet jar/spider.jar || (
+            git add jar/spider.jar
+            git commit -m "chore: 自动更新spider.jar"
+            git push origin HEAD:master
+          )
