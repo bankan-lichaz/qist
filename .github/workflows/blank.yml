@@ -1,12 +1,15 @@
 name: 自动更新 spider.jar
 
-# 触发条件：支持手动触发，同时推送到master分支时自动执行
+# 触发条件：支持手动触发，推送到master分支自动执行，同时每天定时执行
 on:
-  schedule:
-    - cron: "0 16 * * *"   # 每天北京时间 00:00
   workflow_dispatch: # 手动触发按钮，可在GitHub Actions页面点击运行
   push:
     branches: [master] # 推送到master分支时自动执行，不需要可以删掉这行
+  schedule:
+    # 定时触发配置，GitHub Actions 默认使用UTC时区
+    # 以下写法对应【北京时间0点（即24点）】执行：UTC时间 = 北京时间 - 8小时，因此北京时间24点对应UTC 16点
+    # 如果你需要其他时区的时间，自行换算UTC时间修改即可，比如要UTC时区0点执行就改成 '0 0 * * *'
+    - cron: '0 16 * * *'
 
 # 配置权限：需要写入仓库内容的权限才能提交到master分支
 permissions:
