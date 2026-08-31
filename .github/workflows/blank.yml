@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }} # 默认自带仓库访问令牌，无需额外配置
+          fetch-depth: 0 # 拉取完整仓库历史，避免合并/变基时因历史不全出错，仓库很大可以改成2
 
       # 第二步：下载远程jar包到指定目录
       - name: 下载最新spider.jar
@@ -40,9 +41,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # 第四步：检查是否有变更，有则提交推送到master
+      # 第四步：同步远端代码、提交并推送更新
       - name: 提交并推送更新
         run: |
+          # 先拉取远端master的最新变更，用rebase让提交历史更干净
+          # 如果合并出现冲突（通常是远端也修改了spider.jar），则保留本地下载的最新jar，解决冲突后继续
+          git pull origin master --rebase || {
+            echo "检测到合并冲突，自动解决：保留本地最新spider.jar"
+            git checkout --ours jar/spider.jar
+            git add jar/spider.jar
+            git rebase --continue --no-edit
+          }
+          
           # 暂存jar/spider.jar文件
           git add jar/spider.jar
           # 检查是否有实际变更，避免空提交
@@ -50,7 +60,7 @@ jobs:
             echo "spider.jar无更新，跳过提交"
             exit 0
           fi
-          # 提交变更
-          git commit -m "chore: 自动更新spider.jar到最新版本"
+          # 提交变更，添加[skip ci]避免本次提交再次触发工作流，防止无限循环
+          git commit -m "chore: 自动更新spider.jar到最新版本 [skip ci]"
           # 推送到master分支
           git push origin HEAD:master
