@@ -2,6 +2,8 @@ name: 自动更新 spider.jar
 
 # 触发条件：支持手动触发，同时推送到master分支时自动执行
 on:
+  schedule:
+    - cron: "0 16 * * *"   # 每天北京时间 00:00
   workflow_dispatch: # 手动触发按钮，可在GitHub Actions页面点击运行
   push:
     branches: [master] # 推送到master分支时自动执行，不需要可以删掉这行
