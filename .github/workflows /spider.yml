@@ -1,0 +1,51 @@
+name: 自动更新 spider.jar
+
+# 触发条件：支持手动触发，同时推送到master分支时自动执行
+on:
+  workflow_dispatch: # 手动触发按钮，可在GitHub Actions页面点击运行
+  push:
+    branches: [master] # 推送到master分支时自动执行，不需要可以删掉这行
+
+# 配置权限：需要写入仓库内容的权限才能提交到master分支
+permissions:
+  contents: write
+
+jobs:
+  update-spider-jar:
+    runs-on: ubuntu-latest # 使用官方Ubuntu运行环境
+
+    steps:
+      # 第一步：检出你的仓库代码
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # 默认自带仓库访问令牌，无需额外配置
+
+      # 第二步：下载远程jar包到指定目录
+      - name: 下载最新spider.jar
+        run: |
+          # 确保jar目录存在，不存在自动创建
+          mkdir -p jar
+          # 下载文件，-fL参数：失败时返回错误、跟随重定向
+          curl -fL -o jar/spider.jar https://raw.githubusercontent.com/bankan-lichaz/qist/refs/heads/master/jar/spider.jar
+
+      # 第三步：配置Git提交信息（机器人提交，符合规范）
+      - name: 配置Git用户信息
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # 第四步：检查是否有变更，有则提交推送到master
+      - name: 提交并推送更新
+        run: |
+          # 暂存jar/spider.jar文件
+          git add jar/spider.jar
+          # 检查是否有实际变更，避免空提交
+          if git diff --cached --quiet; then
+            echo "spider.jar无更新，跳过提交"
+            exit 0
+          fi
+          # 提交变更
+          git commit -m "chore: 自动更新spider.jar到最新版本"
+          # 推送到master分支
+          git push origin HEAD:master
