@@ -42,25 +42,35 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       # 第四步：同步远端代码、提交并推送更新
-      - name: 提交并推送更新
         run: |
-          # 先拉取远端master的最新变更，用rebase让提交历史更干净
-          # 如果合并出现冲突（通常是远端也修改了spider.jar），则保留本地下载的最新jar，解决冲突后继续
-          git pull origin master --rebase || {
-            echo "检测到合并冲突，自动解决：保留本地最新spider.jar"
-            git checkout --ours jar/spider.jar
-            git add jar/spider.jar
-            git rebase --continue --no-edit
+          # 1. 先备份本地刚下载的jar，避免拉取远端时被未跟踪文件冲突阻止
+          if [ -f jar/spider.jar ]; then
+            mv jar/spider.jar /tmp/spider.jar.bak
+          fi
+
+          # 2. 拉取远端master最新变更，合并时冲突自动保留本地版本（即最新jar）
+          git fetch origin master
+          git merge -X ours origin/master --no-edit || {
+            echo "合并出现异常，恢复本地jar"
+            # 合并失败时恢复备份的jar
+            [ -f /tmp/spider.jar.bak ] && mv /tmp/spider.jar.bak jar/spider.jar
+            exit 1
           }
-          
-          # 暂存jar/spider.jar文件
+
+          # 3. 合并完成后，把本地最新的jar移回目录，覆盖远端可能的旧版本
+          [ -f /tmp/spider.jar.bak ] && mv /tmp/spider.jar.bak jar/spider.jar
+
+          # 4. 暂存jar/spider.jar文件
           git add jar/spider.jar
-          # 检查是否有实际变更，避免空提交
+
+          # 5. 检查是否有实际变更，避免空提交
           if git diff --cached --quiet; then
             echo "spider.jar无更新，跳过提交"
             exit 0
           fi
-          # 提交变更，添加[skip ci]避免本次提交再次触发工作流，防止无限循环
+
+          # 6. 提交变更，添加[skip ci]避免本次提交再次触发工作流，防止无限循环
           git commit -m "chore: 自动更新spider.jar到最新版本 [skip ci]"
-          # 推送到master分支
-          git push origin HEAD:master
+
+          # 7. 推送到master分支，force-with-lease比force更安全，不会覆盖他人提交的其他代码
+          git push --force-with-lease origin HEAD:master
