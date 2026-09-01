@@ -31,6 +31,7 @@ jobs:
           set -e # 命令执行失败立即退出
           mkdir -p jar # 确保jar目录存在
           curl -L -o jar/spider.jar https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/spider.jar
+          curl -L -o jar/spider.jar https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/fan.txt
 
       # 3. 配置Git提交信息（使用官方机器人账号，不会计入个人提交贡献）
       - name: 配置Git用户信息
@@ -45,5 +46,11 @@ jobs:
           git diff --quiet jar/spider.jar || (
             git add jar/spider.jar
             git commit -m "chore: 自动更新spider.jar"
+            git push origin HEAD:master
+          )
+           # 检查fan.txt是否有内容变更
+          git diff --quiet jar/fan.txt || (
+            git add jar/fan.txt
+            git commit -m "chore: 自动更新fan.txt"
             git push origin HEAD:master
           )
