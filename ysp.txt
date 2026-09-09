@@ -1,4 +1,3 @@
-央视频道,#genre#
 CCTV4K,video://https://www.yangshipin.cn/tv/home?pid=600002264
 CCTV1,video://https://www.yangshipin.cn/tv/home?pid=600001859
 CCTV2,video://https://www.yangshipin.cn/tv/home?pid=600001800
@@ -38,7 +37,6 @@ CCTV央视文化精品频道(VIP),video://https://www.yangshipin.cn/tv/home?pid=
 CCTV央视台球频道(VIP),video://https://www.yangshipin.cn/tv/home?pid=600099652
 CCTV电视指南频道(VIP),video://https://www.yangshipin.cn/tv/home?pid=600099656
 CCTV卫生健康频道(VIP),video://https://www.yangshipin.cn/tv/home?pid=600099651
-卫视频道,#genre#
 北京卫视,video://https://www.yangshipin.cn/tv/home?pid=600002309
 江苏卫视,video://https://www.yangshipin.cn/tv/home?pid=600002521
 东方卫视,video://https://www.yangshipin.cn/tv/home?pid=600002483
