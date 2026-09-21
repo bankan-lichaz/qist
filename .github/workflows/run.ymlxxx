@@ -34,7 +34,7 @@ jobs:
       # 3️⃣ 运行处理脚本
       - name: 运行 tvbox 处理脚本
         run: |
-          python tools/tvbox.py https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/dianshi.json xs enc
+          python tools/tvbox.py https://raw.githubusercontent.com/hy5528/tvbox/83156469afa7ac316f79885c573b8b21c6a3faf3/og.json xs enc
 
       - name: Commit xs
         run: |
