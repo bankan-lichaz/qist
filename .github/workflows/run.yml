@@ -36,7 +36,7 @@ jobs:
         run: |
           python tools/tvbox.py https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/dianshi.json xs enc
 
-      - name: Commit xc
+      - name: Commit xs
         run: |
           git config user.name "xs Bot"
           git config user.email "bot@example.com"
