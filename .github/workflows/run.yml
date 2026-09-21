@@ -5,7 +5,7 @@ on:
     - cron: "20 5 * * *"
   push:
     branches:
-      - master
+      - main
     paths:
       - "tools/**"
 jobs:
@@ -25,7 +25,7 @@ jobs:
           cd ../
         shell: bash
 
-      - name: Git push assets to "release" branch
+      - name: Git push generated assets
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -34,7 +34,7 @@ jobs:
       
           if ! git diff-index --quiet HEAD --; then
             git commit -m "更新源 $(date +%Y%m%d%H%M)"
-            git push origin master
+            git push origin HEAD:main
           else
             echo "没有文件更新，不执行 git push"
-          fi
+          fi              
