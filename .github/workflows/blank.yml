@@ -44,10 +44,13 @@ jobs:
       - name: 提交并推送更新
         run: |
           set -e
-           if [ -n "$(git status --porcelain jar/)" ]; then
-              git add jar/
-              git commit -m "chore: 自动更新spider.jar和fan.txt"
-              git pull --rebase origin main
-              git push origin HEAD:master
-            fi
-
+      
+          if [ -n "$(git status --porcelain jar/)" ]; then
+            git add jar/
+            git commit -m "chore: 自动更新spider.jar和fan.txt"
+      
+            # Integrate the current remote master before pushing
+            git pull --rebase origin master
+      
+            git push origin HEAD:master
+          fi
