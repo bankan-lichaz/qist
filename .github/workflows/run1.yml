@@ -43,7 +43,7 @@ jobs:
           if git diff --quiet xs1; then
             echo "No changes in xs1"
           else
-            git add xs
+            git add xs1
             git commit -m "Auto update xs1"
             git pull --rebase origin main
             git push
