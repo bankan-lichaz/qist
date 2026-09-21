@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TVBox 文件加解密工具</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    body { max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin-bottom: .35rem; }
+    .muted { color: #777; }
+    form { display: grid; gap: 1rem; }
+    label { display: grid; gap: .35rem; font-weight: 600; }
+    input, select, button { box-sizing: border-box; width: 100%; padding: .7rem; border: 1px solid #888; border-radius: .4rem; font: inherit; }
+    button { cursor: pointer; background: #0969da; color: white; border: 0; }
+    button:hover { background: #0759b8; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .drop { padding: 1rem; border: 2px dashed #888; border-radius: .5rem; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #222; color: #ddd; padding: 1rem; border-radius: .5rem; min-height: 3rem; }
+    @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>TVBox 文件加解密工具</h1>
+  <p class="muted">浏览器版本：处理 JSON、TVBox Hex/AES-CBC 文件，结果会直接下载到本地。</p>
+
+  <form id="toolForm">
+    <label>操作
+      <select id="mode">
+        <option value="enc">加密 JSON</option>
+        <option value="dec">解密 Hex / JSON</option>
+        <option value="get">获取 URL 内容</option>
+      </select>
+    </label>
+
+    <label>输入 URL（可选）
+      <input id="url" type="url" placeholder="https://example.com/data.json">
+    </label>
+
+    <div class="drop">
+      <label>或选择本地文件
+        <input id="file" type="file" accept=".json,.txt,.conf,*/*">
+      </label>
+    </div>
+
+    <div class="grid">
+      <label>Key
+        <input id="key" value="1234567890123" autocomplete="off">
+      </label>
+      <label>IV
+        <input id="iv" value="1234567890123" autocomplete="off">
+      </label>
+    </div>
+
+    <label>输出文件名
+      <input id="output" value="tvbox-output.txt">
+    </label>
+
+    <button type="submit">执行并下载</button>
+  </form>
+  <pre id="status" aria-live="polite">请选择文件或输入 URL。</pre>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const status = message => { $("status").textContent = message; };
+
+    // Match tvbox.py: keys and IVs are right-padded with ASCII zeroes to 16 bytes.
+    function paddedWord(value) {
+      const bytes = new TextEncoder().encode(value.padEnd(16, "0").slice(0, 16));
+      return CryptoJS.lib.WordArray.create(bytes);
+    }
+
+    function utf8Hex(value) {
+      return CryptoJS.enc.Hex.stringify(CryptoJS.enc.Utf8.parse(value));
+    }
+
+    function encryptJson(text, key, iv) {
+      const data = JSON.parse(text);
+      const plaintext = CryptoJS.enc.Utf8.parse(JSON.stringify(data, null, 2));
+      const encrypted = CryptoJS.AES.encrypt(plaintext, paddedWord(key), {
+        iv: paddedWord(iv), mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7
+      });
+      return utf8Hex(`$#${key}#$`) + encrypted.ciphertext.toString(CryptoJS.enc.Hex) + utf8Hex(iv);
+    }
+
+    function decryptText(text) {
+      let input = text.replace(/^\\/\\/.*$/gm, "").trim();
+      try { return JSON.stringify(JSON.parse(input), null, 2); } catch (_) { /* encrypted input */ }
+      if (!/^[0-9a-f]+$/i.test(input) || input.length % 2) throw new Error("内容既不是有效 JSON，也不是有效 Hex 数据。");
+
+      const marker = input.indexOf(utf8Hex("#$"));
+      if (marker < 0) throw new Error("未找到有效的 TVBox 头部标记。");
+      const headerEnd = marker + 4;
+      const ivHex = input.slice(-26);
+      const cipherHex = input.slice(headerEnd, -26);
+      const realKey = CryptoJS.enc.Hex.parse(input.slice(0, headerEnd)).toString(CryptoJS.enc.Utf8).slice(2, -2);
+      const realIv = CryptoJS.enc.Hex.parse(ivHex).toString(CryptoJS.enc.Utf8);
+      const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext: CryptoJS.enc.Hex.parse(cipherHex) });
+      const decrypted = CryptoJS.AES.decrypt(cipherParams, paddedWord(realKey), {
+        iv: paddedWord(realIv), mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7
+      }).toString(CryptoJS.enc.Utf8);
+      return JSON.stringify(JSON.parse(decrypted), null, 2);
+    }
+
+    async function readInput() {
+      const file = $("file").files[0];
+      const url = $("url").value.trim();
+      if (file) return await file.text();
+      if (url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        return await response.text();
+      }
+      throw new Error("请选择本地文件或输入 URL。");
+    }
+
+    $("toolForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        status("正在读取内容……");
+        const input = await readInput();
+        const mode = $("mode").value;
+        let result;
+        let filename = $("output").value.trim() || "tvbox-output.txt";
+        if (mode === "enc") {
+          result = encryptJson(input, $("key").value, $("iv").value);
+          if (!filename.includes(".")) filename += ".txt";
+        } else if (mode === "dec") {
+          result = decryptText(input);
+          if (filename === "tvbox-output.txt") filename = "tvbox-output.json";
+        } else {
+          result = input.replace(/^\\/\\/.*$/gm, "").trim();
+          try { result = JSON.stringify(JSON.parse(result), null, 2); } catch (_) { /* plain text */ }
+          if (filename === "tvbox-output.txt") filename = "downloaded-content.txt";
+        }
+        const blob = new Blob([result], { type: "text/plain;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        status(`完成：已下载 ${filename}`);
+      } catch (error) {
+        status(`失败：${error.message}`);
+      }
+    });
+  </script>
+</body>
+</html>
