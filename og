@@ -12,8 +12,16 @@
 ]}]}],
 "spider":"clan://Pictures/TVBox/searchjar/cc.jar",
 "flags":["youku","qq","iqiyi","qiyi","letv","sohu","tudou","pptv","mgtv","wasu","bilibili","renrenmi"],
-"ijk":[
-{"group":"软解码","options":[
-{"category":4,"name":"opensles","value":"0"}
+"ijk": [
+  {
+    "group": "软解码",
+    "options": [
+      {
+        "category": 4,
+        "name": "opensles",
+        "value": "0"
+      }
+    ]
+  }
 ]
 }
