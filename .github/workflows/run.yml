@@ -32,7 +32,7 @@ jobs:
           pip install demjson3 pycryptodome requests --break-system-packages
 
       # 3️⃣ 运行处理脚本
-      - name: 运行 IPTV 处理脚本
+      - name: 运行 tvbox 处理脚本
         run: |
           python tools/tvbox.py https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/dianshi.json xc enc
 
