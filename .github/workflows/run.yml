@@ -1,0 +1,50 @@
+name: update xs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"   # 每 6 小时自动运行一次
+
+# 让工作流拥有往仓库推送内容的权限
+permissions:
+  contents: write
+
+jobs:
+  update-iptv:
+    runs-on: ubuntu-latest
+    steps:
+      # 1️⃣ 检出仓库代码
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true   # 后续 push 需要保持凭据
+
+      # 2️⃣ 安装 Python 并获取依赖（requests）
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'   # 使用最新的 3.x 版本
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install demjson3 pycryptodome requests --break-system-packages
+
+      # 3️⃣ 运行处理脚本
+      - name: 运行 IPTV 处理脚本
+        run: |
+          python tools/tvbox.py https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/dianshi.json xc enc
+
+      - name: Commit xc
+        run: |
+          git config user.name "xs Bot"
+          git config user.email "bot@example.com"
+          if git diff --quiet xs; then
+            echo "No changes in xs"
+          else
+            git add xs
+            git commit -m "Auto update xs"
+            git pull --rebase origin main
+            git push
+          fi
