@@ -316,7 +316,7 @@ class 文件加解密器:
             # 处理输出文件名
             if isinstance(输入文件, str) and self.是URL(输入文件):
                 # 如果输出路径是文件（不是目录），直接使用它
-                if 输出路径.suffix:
+                if isinstance(输入文件, str) and self.是URL(输入文件):
                     输出文件 = 输出路径
                 else:
                     # 从URL提取文件名，如果没有则使用默认名称
