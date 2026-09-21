@@ -1,63 +1,103 @@
-const HTML = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TVBox Merge Worker</title>
-<style>
-body{font:15px system-ui,sans-serif;background:#101827;color:#e5e7eb;max-width:1100px;margin:25px auto;padding:0 14px}section{background:#182235;border:1px solid #334155;border-radius:10px;padding:18px;margin:16px 0}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{display:block;font-weight:600;margin:8px 0 5px}input,textarea,button{width:100%;box-sizing:border-box;padding:10px;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e5e7eb;font:inherit}textarea{min-height:130px;resize:vertical}.checks{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}.checks label{font-weight:400;margin:0}.checks input{width:auto;margin-right:5px}button{background:#2563eb;border:0;cursor:pointer;font-weight:700;margin-top:12px}button:hover{background:#1d4ed8}iframe{width:100%;height:350px;background:#fff;border:1px solid #475569;border-radius:6px}code{color:#93c5fd}@media(max-width:700px){.grid{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<h1>TVBox merge worker</h1>
-<p>Enter one source per line. Per-source options use <code>URL|group=News|strip=1</code>. Global options apply after all sources are merged.</p>
-<section>
-<label for="sources">Sources</label>
-<textarea id="sources" placeholder="https://example.com/one.txt\nhttps://example.com/two.txt|group=News|strip=1"></textarea>
-<div class="grid">
-<div><label for="include">Global include</label><input id="include" placeholder="News,HD"></div>
-<div><label for="exclude">Global exclude</label><input id="exclude" placeholder="広告,测试"></div>
-<div><label for="group">Global group</label><input id="group"></div>
-<div><label for="key">Global decrypt key</label><input id="key"></div>
-<div><label for="start">Global start</label><input id="start" type="number" min="1" value="1"></div>
-<div><label for="end">Global end</label><input id="end" type="number" min="1" placeholder="optional"></div>
-</div>
-<div class="checks">
-<label><input id="strip" type="checkbox"> Global strip after $</label>
-<label><input id="dedupe" type="checkbox"> Global deduplicate</label>
-<label><input id="decrypt" type="checkbox"> Global XOR decrypt</label>
-</div>
-<button id="run" type="button">Merge and show result</button>
-<div id="status">Ready.</div>
-</section>
-<section>
-<label for="result">Result</label>
-<textarea id="result" readonly></textarea>
-<label>Result frame</label>
-<iframe id="frame" sandbox></iframe>
-</section>
-<script>
-const $=id=>document.getElementById(id);
-function add(p,k,v){if(v!==null&&v!==undefined&&v!==''&&v!==false)p.set(k,String(v));}
-function makeUrl(){
- const p=new URLSearchParams();
- const sources=$("sources").value.split(/\\n+/).map(x=>x.trim()).filter(Boolean);
- if(!sources.length)throw Error('Enter at least one source URL');
- p.set('merge',sources.join(','));
- add(p,'include',$("include").value.trim()); add(p,'exclude',$("exclude").value.trim()); add(p,'group',$("group").value.trim());
- add(p,'key',$("key").value); add(p,'start',$("start").value||'1'); add(p,'end',$("end").value);
- if($("strip").checked)p.set('strip','1'); if($("dedupe").checked)p.set('dedupe','1'); if($("decrypt").checked)p.set('decrypt','1');
- return '?' + p.toString();
+function tvboxBytes(value) {
+  return new TextEncoder().encode(value);
 }
-$("run").onclick=async()=>{try{$("status").textContent='Fetching and processing...';const r=await fetch(makeUrl());const t=await r.text();if(!r.ok)throw Error(t||r.statusText);$("result").value=t;const esc=t.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');$("frame").srcdoc='<pre style="white-space:pre-wrap;overflow-wrap:anywhere;padding:14px">'+esc+'</pre>';$('status').textContent='Done: '+t.split(/\\n/).filter(Boolean).length+' lines';}catch(e){$('status').textContent='Error: '+e.message;$('result').value='';$('frame').srcdoc='';}};
-</script>
-</body>
-</html>`;
+
+function tvboxHex(bytes) {
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function tvboxFromHex(hex) {
+  if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2) {
+    throw new Error("Invalid TVBox hex data");
+  }
+  return Uint8Array.from(hex.match(/../g), byte => parseInt(byte, 16));
+}
+
+function tvboxWord(value) {
+  // Match tvbox.py: right-pad key and IV with ASCII zeroes to 16 bytes.
+  return tvboxBytes((value + "0000000000000000").slice(0, 16));
+}
+
+async function tvboxKey(value) {
+  return crypto.subtle.importKey(
+    "raw",
+    tvboxWord(value),
+    { name: "AES-CBC" },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+function tvboxJsonValue(text) {
+  const value = text.trim();
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    // Allow merged plain text too. It is encoded as a JSON string so the
+    // output remains compatible with the TVBox AES format.
+    return text;
+  }
+}
+
+async function tvboxEncrypt(text, key, iv) {
+  if (!key || !iv) throw new Error("TVBox encryption requires key and iv");
+
+  const plaintext = tvboxBytes(JSON.stringify(tvboxJsonValue(text), null, 2));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-CBC", iv: tvboxWord(iv) },
+    await tvboxKey(key),
+    plaintext
+  );
+
+  const header = tvboxHex(tvboxBytes(`$#${key}#$`));
+  const cipher = tvboxHex(new Uint8Array(encrypted));
+  const ivHex = tvboxHex(tvboxBytes(iv));
+  return header + cipher + ivHex;
+}
+
+async function tvboxDecrypt(text) {
+  const input = text.replace(/^\\/\\/.*$/gm, "").trim();
+  if (!input) return input;
+
+  // Plain JSON is already decrypted.
+  try {
+    return JSON.stringify(JSON.parse(input), null, 2);
+  } catch (_) {
+    // Continue with TVBox hex parsing.
+  }
+
+  if (!/^[0-9a-f]+$/i.test(input) || input.length % 2) {
+    throw new Error("Content is neither JSON nor TVBox hex data");
+  }
+
+  const marker = input.indexOf(tvboxHex(tvboxBytes("#$")));
+  if (marker < 0) throw new Error("TVBox header was not found");
+
+  const headerEnd = marker + 4;
+  const ivHex = input.slice(-26);
+  const cipherHex = input.slice(headerEnd, -26);
+  const realKey = new TextDecoder().decode(tvboxFromHex(input.slice(0, headerEnd))).slice(2, -2);
+  const realIv = new TextDecoder().decode(tvboxFromHex(ivHex));
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-CBC", iv: tvboxWord(realIv) },
+    await tvboxKey(realKey),
+    tvboxFromHex(cipherHex)
+  );
+  const decoded = new TextDecoder().decode(decrypted);
+
+  try {
+    const value = JSON.parse(decoded);
+    return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  } catch (_) {
+    return decoded;
+  }
+}
 
 function xorDecrypt(text, enabled, key) {
   if (!enabled || !key) return text;
   const compact = text.trim();
-  if (!compact || compact.length < 8 || /\s/.test(compact) ||
+  if (!compact || compact.length < 8 || /\\s/.test(compact) ||
       !/^[0-9A-Za-z+/]+={0,2}$/.test(compact) || compact.length % 4 !== 0) return text;
   try {
     const binary = atob(compact);
@@ -70,7 +110,7 @@ function xorDecrypt(text, enabled, key) {
 }
 
 function sourceParams(parts) {
-  const p = { decrypt:false, key:"", include:null, exclude:null, group:null, strip:false, start:1, end:null, dedupe:false };
+  const p = { decrypt:false, key:"", include:null, exclude:null, group:null, strip:false, start:1, end:null, dedupe:false, tvbox:null, tvboxKey:"", tvboxIv:"" };
   for (const item of parts.slice(1)) {
     const pos = item.indexOf("=");
     const k = pos < 0 ? item : item.slice(0, pos);
@@ -84,28 +124,44 @@ function sourceParams(parts) {
     else if (k === "start") p.start = Number.parseInt(v, 10) || 1;
     else if (k === "end") p.end = Number.parseInt(v, 10) || null;
     else if (k === "dedupe") p.dedupe = v === "1";
+    else if (k === "tvbox") p.tvbox = v === "1" ? 1 : v === "0" ? 0 : null;
+    else if (k === "tvboxKey" || k === "tvkey") p.tvboxKey = v;
+    else if (k === "tvboxIv" || k === "tviv") p.tvboxIv = v;
   }
   return p;
 }
 
-function processLines(text, p) {
-  let lines = xorDecrypt(text, p.decrypt, p.key).split(/\r?\n/);
+async function processLines(text, p) {
+  if (p.tvbox === 0) text = await tvboxDecrypt(text);
+  text = xorDecrypt(text, p.decrypt, p.key);
+
+  let lines = text.split(/\r?\n/);
   if (p.end !== null) lines = lines.slice(Math.max(0, p.start - 1), p.end);
   if (p.group) lines = lines.filter(x => x.includes(p.group));
   if (p.include) { const keys = p.include.split(/[;,]/).filter(Boolean); lines = lines.filter(x => keys.some(k => x.includes(k))); }
   if (p.exclude) { const keys = p.exclude.split(/[;,]/).filter(Boolean); lines = lines.filter(x => !keys.some(k => x.includes(k))); }
   if (p.strip) lines = lines.map(x => { const i = x.indexOf("$"); return i < 0 ? x : x.slice(0, i); });
   if (p.dedupe) lines = [...new Set(lines)];
-  return lines.filter(x => x.trim());
+
+  lines = lines.filter(x => x.trim());
+  if (p.tvbox === 1) {
+    const encrypted = await tvboxEncrypt(lines.join("\n"), p.tvboxKey || p.key, p.tvboxIv || p.key);
+    return [encrypted];
+  }
+  return lines;
 }
 
 function globalParams(url) {
+  const tvbox = url.searchParams.get("tvbox");
   return {
     include:url.searchParams.get("include"), exclude:url.searchParams.get("exclude"), group:url.searchParams.get("group"),
     strip:url.searchParams.get("strip") === "1", dedupe:url.searchParams.get("dedupe") === "1",
     start:Number.parseInt(url.searchParams.get("start"),10) || 1,
     end:url.searchParams.has("end") ? Number.parseInt(url.searchParams.get("end"),10) : null,
-    decrypt:url.searchParams.get("decrypt") === "1", key:url.searchParams.get("key") || ""
+    decrypt:url.searchParams.get("decrypt") === "1", key:url.searchParams.get("key") || "",
+    tvbox:tvbox === "1" ? 1 : tvbox === "0" ? 0 : null,
+    tvboxKey:url.searchParams.get("tvboxKey") || url.searchParams.get("tvkey") || url.searchParams.get("key") || "",
+    tvboxIv:url.searchParams.get("tvboxIv") || url.searchParams.get("tviv") || url.searchParams.get("key") || ""
   };
 }
 
@@ -113,31 +169,49 @@ async function mergeResponse(request) {
   const url = new URL(request.url);
   const merge = url.searchParams.get("merge");
   if (!merge) return new Response("Missing merge parameter", { status:400 });
+
   const sources = merge.split(",").map(item => item.split("|")).filter(parts => parts[0]);
-  const finalLines = [];
+  let finalLines = [];
   for (const parts of sources) {
     const response = await fetch(parts[0]);
     if (!response.ok) continue;
-    finalLines.push(...processLines(await response.text(), sourceParams(parts)));
+    finalLines.push(...await processLines(await response.text(), sourceParams(parts)));
   }
+
   const p = globalParams(url);
-  let lines = p.decrypt && p.key ? finalLines.map(x => xorDecrypt(x, true, p.key)) : finalLines;
-  if (p.end !== null && Number.isFinite(p.end)) lines = lines.slice(Math.max(0, p.start - 1), p.end);
-  if (p.group) lines = lines.filter(x => x.includes(p.group));
-  if (p.include) { const keys = p.include.split(",").filter(Boolean); lines = lines.filter(x => keys.some(k => x.includes(k))); }
-  if (p.exclude) { const keys = p.exclude.split(",").filter(Boolean); lines = lines.filter(x => !keys.some(k => x.includes(k))); }
-  if (p.strip) lines = lines.map(x => { const i = x.indexOf("$"); return i < 0 ? x : x.slice(0, i); });
-  if (p.dedupe) lines = [...new Set(lines)];
-  return new Response(lines.filter(x => x.trim()).join("\n"), { headers:{"Content-Type":"text/plain; charset=utf-8","Access-Control-Allow-Origin":"*"} });
+  if (p.tvbox === 0) {
+    const joined = finalLines.join("\n");
+    try {
+      finalLines = (await tvboxDecrypt(joined)).split(/\r?\n/).filter(x => x.trim());
+    } catch (_) {
+      const decrypted = [];
+      for (const line of finalLines) {
+        try { decrypted.push(await tvboxDecrypt(line)); } catch (_) { decrypted.push(line); }
+      }
+      finalLines = decrypted;
+    }
+  }
+
+  if (p.decrypt && p.key) finalLines = finalLines.map(x => xorDecrypt(x, true, p.key));
+  if (p.end !== null && Number.isFinite(p.end)) finalLines = finalLines.slice(Math.max(0, p.start - 1), p.end);
+  if (p.group) finalLines = finalLines.filter(x => x.includes(p.group));
+  if (p.include) { const keys = p.include.split(",").filter(Boolean); finalLines = finalLines.filter(x => keys.some(k => x.includes(k))); }
+  if (p.exclude) { const keys = p.exclude.split(",").filter(Boolean); finalLines = finalLines.filter(x => !keys.some(k => x.includes(k))); }
+  if (p.strip) finalLines = finalLines.map(x => { const i = x.indexOf("$"); return i < 0 ? x : x.slice(0, i); });
+  if (p.dedupe) finalLines = [...new Set(finalLines)];
+
+  finalLines = finalLines.filter(x => x.trim());
+  let output = finalLines.join("\n");
+  if (p.tvbox === 1) output = await tvboxEncrypt(output, p.tvboxKey, p.tvboxIv);
+
+  return new Response(output, { headers:{"Content-Type":"text/plain; charset=utf-8","Access-Control-Allow-Origin":"*"} });
 }
 
 export default {
   async fetch(request) {
     const url = new URL(request.url);
-    if (url.searchParams.has("merge")) {
-      try { return await mergeResponse(request); }
-      catch (error) { return new Response("Worker error: " + error.message, { status:502 }); }
-    }
-    return new Response(HTML, { headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"} });
+    if (!url.searchParams.has("merge")) return new Response("Missing merge parameter", { status:400 });
+    try { return await mergeResponse(request); }
+    catch (error) { return new Response("Worker error: " + error.message, { status:502 }); }
   }
 };
