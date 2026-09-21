@@ -56,7 +56,7 @@ async function tvboxEncrypt(text, key, iv) {
 }
 
 async function tvboxDecrypt(text) {
-  const input = text.replace(/^\\/\\/.*$/gm, "").trim();
+  const input = text.replace(/^\/\/.*$/gm, "").trim();
   if (!input) return input;
 
   // Plain JSON is already decrypted.
@@ -97,7 +97,7 @@ async function tvboxDecrypt(text) {
 function xorDecrypt(text, enabled, key) {
   if (!enabled || !key) return text;
   const compact = text.trim();
-  if (!compact || compact.length < 8 || /\\s/.test(compact) ||
+  if (!compact || compact.length < 8 || /\s/.test(compact) ||
       !/^[0-9A-Za-z+/]+={0,2}$/.test(compact) || compact.length % 4 !== 0) return text;
   try {
     const binary = atob(compact);
