@@ -637,7 +637,7 @@ if (params.cut) {
         add: null,
         cut: null,
         normalize: false,
-        m3u: false
+        m3u: false,
         tvbox: null,
         tvboxKey: "",
         tvboxIv: "",
