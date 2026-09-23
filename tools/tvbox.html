@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TVBox 文件加解密工具</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, -apple-system, "Microsoft YaHei", sans-serif; }
+    body { max-width: 900px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+    h1 { margin-bottom: .25rem; }
+    .hint { color: #777; margin-top: 0; }
+    label { display: block; font-weight: 600; margin-top: 1rem; }
+    input, select, button, textarea { box-sizing: border-box; width: 100%; padding: .65rem; margin-top: .35rem; font: inherit; }
+    textarea { min-height: 180px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    button { cursor: pointer; font-weight: 700; }
+    #status { white-space: pre-wrap; background: #eee; color: #222; padding: .75rem; border-radius: .35rem; margin-top: 1rem; }
+    @media (max-width: 650px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>TVBox 文件加解密工具</h1>
+  <p class="hint">解密会自动从加密内容中读取 key 和 IV，无需手动输入。所有处理均在浏览器本地完成。</p>
+
+  <label for="source">输入文件或 URL</label>
+  <input id="source" type="text" placeholder="选择本地文件，或粘贴 http(s):// 地址">
+  <input id="file" type="file" accept=".json,.txt,.hex,.tvbox">
+
+  <div class="row">
+    <div>
+      <label for="mode">模式</label>
+      <select id="mode">
+        <option value="dec">解密</option>
+        <option value="enc">加密</option>
+        <option value="get">获取 URL 内容</option>
+      </select>
+    </div>
+    <div>
+      <label for="name">下载文件名</label>
+      <input id="name" value="output.json">
+    </div>
+  </div>
+
+  <label for="text">或直接粘贴内容（优先使用此内容）</label>
+  <textarea id="text" placeholder="JSON、加密 hex 内容或 URL 返回的文本"></textarea>
+  <button id="run">开始处理</button>
+  <div id="status">等待处理…</div>
+
+<script>
+'use strict';
+
+// 与 tvbox.py 保持一致：加密时使用默认值；解密时从文件头和末尾自动提取。
+const DEFAULT_KEY = '1234567890123';
+const DEFAULT_IV = '1234567890123';
+const $ = id => document.getElementById(id);
+
+function log(message) { $('status').textContent = message; }
+function hexToBytes(hex) {
+  if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2) throw new Error('不是有效的 hex 数据');
+  const result = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < result.length; i++) result[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return result;
+}
+function bytesToHex(bytes) {
+  return [...new Uint8Array(bytes)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function textToHex(text) { return bytesToHex(new TextEncoder().encode(text)); }
+function bytesToText(bytes) { return new TextDecoder().decode(bytes); }
+function aesText(text) { return new TextEncoder().encode(text); }
+function padded16(text) {
+  // Python 的 str.ljust(16, '0') 对这里的 ASCII key/IV 等价于补 0；超过 16 字节时 AES 会报错。
+  const bytes = aesText(text);
+  if (bytes.length > 16) throw new Error('key 或 IV 不能超过 16 个 ASCII 字节');
+  const out = new Uint8Array(16); out.set(bytes); return out;
+}
+
+async function decryptHex(input) {
+  let hex = input.replace(/^\/\/.*$/gm, '').trim();
+  try { return JSON.stringify(JSON.parse(hex), null, 2); } catch (_) { /* 继续按加密格式处理 */ }
+  if (!/^[0-9a-f]+$/i.test(hex)) throw new Error('内容既不是 JSON 也不是有效的 hex 加密数据');
+  const marker = '2324'; // "#$"
+  const markerPos = hex.indexOf(marker);
+  if (markerPos < 0) throw new Error('文件格式错误：未找到头部标记');
+  const headerEnd = markerPos + marker.length;
+  if (hex.length < headerEnd + 26) throw new Error('加密数据长度不足');
+  const headerHex = hex.slice(0, headerEnd);
+  const ivHex = hex.slice(-26); // 默认 IV 为 13 字节
+  const cipherHex = hex.slice(headerEnd, -26);
+  const header = bytesToText(hexToBytes(headerHex));
+  if (!header.startsWith('$#') || !header.endsWith('#$')) throw new Error('无效的加密头部');
+  const key = header.slice(2, -2);
+  const iv = bytesToBytes(hexToBytes(ivHex));
+  const cryptoKey = await crypto.subtle.importKey('raw', padded16(key), { name: 'AES-CBC' }, false, ['decrypt']);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: padded16(iv) }, cryptoKey, hexToBytes(cipherHex));
+  return JSON.stringify(JSON.parse(bytesToText(plain)), null, 2);
+}
+
+// 仅为避免把 Uint8Array 转成字符串时发生隐式转换，单独保留清晰的命名。
+function bytesToBytes(bytes) { return bytesToText(bytes); }
+
+async function encryptJson(input) {
+  const data = JSON.parse(input.replace(/^\/\/.*$/gm, '').trim());
+  const key = DEFAULT_KEY, iv = DEFAULT_IV;
+  const cryptoKey = await crypto.subtle.importKey('raw', padded16(key), { name: 'AES-CBC' }, false, ['encrypt']);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-CBC', iv: padded16(iv) }, cryptoKey, aesText(JSON.stringify(data)));
+  return textToHex(`$#${key}#$`) + bytesToHex(encrypted) + textToHex(iv);
+}
+
+async function fetchContent(url) {
+  const response = await fetch(url, { headers: { 'Accept-Encoding': 'gzip, deflate' } });
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  let text = await response.text();
+  // 浏览器通常会自动处理 HTTP gzip；兼容返回 base64 文本的情况。
+  const stripped = text.trim();
+  if (!/^[0-9a-f]+$/i.test(stripped) && /^[A-Za-z0-9+/=\s]+$/.test(stripped) && stripped.length >= 50) {
+    try { text = new TextDecoder().decode(Uint8Array.from(atob(stripped), c => c.charCodeAt(0))); } catch (_) { /* 原样返回 */ }
+  }
+  return text;
+}
+function download(content, filename) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename || 'output.json';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function getInput() {
+  if ($('text').value.trim()) return $('text').value;
+  const file = $('file').files[0];
+  if (file) return await file.text();
+  const source = $('source').value.trim();
+  if (/^https?:\/\//i.test(source)) return await fetchContent(source);
+  if (source) throw new Error('输入框中请输入 URL，或选择本地文件');
+  throw new Error('请提供输入内容、文件或 URL');
+}
+$('run').addEventListener('click', async () => {
+  $('run').disabled = true; log('处理中…');
+  try {
+    const mode = $('mode').value, input = await getInput();
+    let output, filename = $('name').value.trim();
+    if (mode === 'dec') { output = await decryptHex(input); if (!filename) filename = 'output.json'; }
+    else if (mode === 'enc') { output = await encryptJson(input); if (!filename) filename = 'encrypted.txt'; }
+    else { output = input; if (!filename) filename = 'output.txt'; }
+    download(output, filename);
+    log(`处理成功，已下载：${filename}`);
+  } catch (error) { log(`处理失败：${error.message}`); }
+  finally { $('run').disabled = false; }
+});
+</script>
+</body>
+</html>
