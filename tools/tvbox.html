@@ -1,92 +1,30 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TVBox 文件加解密工具</title>
-  <style>
-    :root { --bg:#f4f6f8; --panel:#fff; --panel-strong:#eef2f7; --text:#1d2433; --muted:#667085; --border:#dfe5ee; --button:#2563eb; --button-text:#fff; --button-alt:#e7edf7; --shadow:rgba(15,23,42,.08); --input-bg:#fff; --status-bg:#edf2ff; --status-text:#1f2a44; --result-bg:#f9fafb; }
-    :root.dark { --bg:#0f172a; --panel:#111827; --panel-strong:#1f2937; --text:#e5eefb; --muted:#9aa9bc; --border:#2d3748; --button:#60a5fa; --button-text:#08111f; --button-alt:#1f2937; --shadow:rgba(0,0,0,.32); --input-bg:#0b1220; --status-bg:#162235; --status-text:#dfeaff; --result-bg:#0b1220; }
-    * { box-sizing:border-box; }
-    html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif; }
-    body { max-width:900px; margin:2rem auto; padding:0 1rem 2rem; line-height:1.6; }
-    h1 { margin-bottom:.25rem; } .hint { color:var(--muted); margin-top:0; }
-    .header-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
-    label { display:block; font-weight:600; margin-top:1rem; }
-    input,select,button,textarea { width:100%; padding:.7rem .8rem; margin-top:.35rem; font:inherit; border-radius:.55rem; border:1px solid var(--border); background:var(--input-bg); color:var(--text); }
-    textarea { min-height:180px; resize:vertical; background:var(--result-bg); }
-    button { cursor:pointer; font-weight:700; border:1px solid transparent; background:var(--button); color:var(--button-text); box-shadow:0 6px 18px var(--shadow); }
-    button.secondary,.theme-toggle { background:var(--button-alt); color:var(--text); border-color:var(--border); box-shadow:none; }
-    .row,.actions { display:grid; grid-template-columns:1fr 1fr; gap:1rem; } .actions { margin:.6rem 0 .8rem; }
-    button:disabled { cursor:not-allowed; opacity:.6; } #resultPanel { display:none; }
-    #status { white-space:pre-wrap; background:var(--status-bg); color:var(--status-text); padding:.8rem .9rem; border-radius:.6rem; margin-top:1rem; border:1px solid var(--border); }
-    @media (max-width:650px) { .row,.actions,.header-row { grid-template-columns:1fr; display:grid; } .header-row { align-items:start; } .theme-toggle { width:fit-content; } }
-  </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TVBox 文件加解密工具</title>
+<style>
+:root{--bg:#f4f6f8;--panel:#fff;--text:#1d2433;--muted:#667085;--border:#dfe5ee;--button:#2563eb;--button-text:#fff;--alt:#e7edf7;--shadow:rgba(15,23,42,.08);--input:#fff;--status:#edf2ff;--status-text:#1f2a44;--result:#f9fafb} :root.dark{--bg:#0f172a;--panel:#111827;--text:#e5eefb;--muted:#9aa9bc;--border:#2d3748;--button:#60a5fa;--button-text:#08111f;--alt:#1f2937;--shadow:rgba(0,0,0,.32);--input:#0b1220;--status:#162235;--status-text:#dfeaff;--result:#0b1220}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}body{max-width:900px;margin:2rem auto;padding:0 1rem 2rem;line-height:1.6}h1{margin-bottom:.25rem}.hint{color:var(--muted);margin-top:0}.header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}label{display:block;font-weight:600;margin-top:1rem}input,select,button,textarea{width:100%;padding:.7rem .8rem;margin-top:.35rem;font:inherit;border-radius:.55rem;border:1px solid var(--border);background:var(--input);color:var(--text)}textarea{min-height:180px;resize:vertical;background:var(--result)}button{cursor:pointer;font-weight:700;border:1px solid transparent;background:var(--button);color:var(--button-text);box-shadow:0 6px 18px var(--shadow)}button.secondary,.theme{background:var(--alt);color:var(--text);border-color:var(--border);box-shadow:none}.row,.actions{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.actions{margin:.6rem 0 .8rem}button:disabled{cursor:not-allowed;opacity:.6}#resultPanel{display:none}#status{white-space:pre-wrap;background:var(--status);color:var(--status-text);padding:.8rem .9rem;border-radius:.6rem;margin-top:1rem;border:1px solid var(--border)}@media(max-width:650px){.row,.actions,.header{grid-template-columns:1fr;display:grid}.header{align-items:start}.theme{width:fit-content}}
+</style>
 </head>
 <body>
-  <div class="header-row"><h1>TVBox 文件加解密工具</h1><button class="theme-toggle" id="themeToggle" type="button">🌙 深色</button></div>
-  <p class="hint">解密会自动从密文头部读取 Key、从密文末尾读取 Iv，无需手动输入。加密时可自定义 Key 和 Iv，留空使用默认值。所有处理均在浏览器本地完成。</p>
-  <label for="source">输入文件或 URL</label><input id="source" type="text" placeholder="选择本地文件，或粘贴 http(s):// 地址"><input id="file" type="file" accept=".json,.txt,.hex,.tvbox">
-  <div class="row">
-    <div><label for="mode">模式</label><select id="mode"><option value="dec">解密</option><option value="enc">加密</option><option value="get">获取 URL 内容</option></select></div>
-    <div><label for="name">下载文件名</label><input id="name" value="output.json"></div>
-  </div>
-  <div class="row" id="keyIvFields">
-    <div><label for="key">Key（最多 16 个 ASCII 字节）</label><input id="key" type="text" placeholder="留空使用默认 Key"></div>
-    <div><label for="iv">Iv（必须为 13 个 ASCII 字符）</label><input id="iv" type="text" placeholder="留空使用默认 Iv"></div>
-  </div>
-  <label for="text">或直接粘贴内容（优先使用此内容）</label><textarea id="text" placeholder="JSON、加密 hex 内容或 URL 返回的文本"></textarea>
-  <button id="run" type="button">开始处理</button><div id="status">等待处理…</div>
-  <section id="resultPanel"><label for="result">处理结果</label><div class="actions"><button id="download" class="secondary" type="button">下载结果</button><button id="copy" class="secondary" type="button">复制结果</button></div><textarea id="result" readonly placeholder="处理结果会显示在这里"></textarea></section>
+<div class="header"><h1>TVBox 文件加解密工具</h1><button class="theme" id="themeToggle" type="button">🌙 深色</button></div>
+<p class="hint">算法与 Worker 保持一致：Key 和 Iv 都按前 16 个字符补 0 使用；解密自动从密文头部读取 Key、从末尾读取 Iv。加密时可自定义，留空使用默认值。</p>
+<label for="source">输入文件或 URL</label><input id="source" type="text" placeholder="选择本地文件，或粘贴 http(s):// 地址"><input id="file" type="file" accept=".json,.txt,.hex,.tvbox">
+<div class="row"><div><label for="mode">模式</label><select id="mode"><option value="dec">解密</option><option value="enc">加密</option><option value="get">获取 URL 内容</option></select></div><div><label for="name">下载文件名</label><input id="name" value="output.json"></div></div>
+<div class="row" id="keyIvFields"><div><label for="key">Key（留空使用默认值）</label><input id="key" placeholder="1234567890123"></div><div><label for="iv">Iv（留空使用默认值）</label><input id="iv" placeholder="1234567890123"></div></div>
+<label for="text">或直接粘贴内容（优先使用此内容）</label><textarea id="text" placeholder="JSON、加密 hex 内容或 URL 返回的文本"></textarea><button id="run" type="button">开始处理</button><div id="status">等待处理…</div>
+<section id="resultPanel"><label for="result">处理结果</label><div class="actions"><button id="download" class="secondary" type="button">下载结果</button><button id="copy" class="secondary" type="button">复制结果</button></div><textarea id="result" readonly></textarea></section>
 <script>
 'use strict';
-const DEFAULT_KEY='1234567890123', DEFAULT_IV='1234567890123';
-let processedResult='', processedFilename='output.json';
-const $=id=>document.getElementById(id);
-function applyTheme(theme){const dark=theme==='dark';document.documentElement.classList.toggle('dark',dark);$('themeToggle').textContent=dark?'☀️ 浅色':'🌙 深色';localStorage.setItem('tvbox-theme',theme);}
-const savedTheme=localStorage.getItem('tvbox-theme'); applyTheme(savedTheme==='dark'||(!savedTheme&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');
-$('themeToggle').addEventListener('click',()=>applyTheme(document.documentElement.classList.contains('dark')?'light':'dark'));
-function log(message){$('status').textContent=message;}
-function hexToBytes(hex){if(!/^[0-9a-f]+$/i.test(hex)||hex.length%2)throw new Error('不是有效的 hex 数据');const r=new Uint8Array(hex.length/2);for(let i=0;i<r.length;i++)r[i]=parseInt(hex.slice(i*2,i*2+2),16);return r;}
-function bytesToHex(bytes){return [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');}
-function textToHex(text){return bytesToHex(new TextEncoder().encode(text));}
-function bytesToText(bytes){return new TextDecoder().decode(bytes);}
-function padded16(text,label){const bytes=new TextEncoder().encode(text);if(bytes.length>16)throw new Error(`${label} 不能超过 16 个 ASCII 字节`);const out=new Uint8Array(16);out.set(bytes);return out;}
-function pkcs7Pad(bytes){const n=16-(bytes.length%16),out=new Uint8Array(bytes.length+n);out.set(bytes);out.fill(n,bytes.length);return out;}
-function pkcs7Unpad(bytes){if(!bytes.length||bytes.length%16)throw new Error('解密数据长度无效');const n=bytes[bytes.length-1];if(n<1||n>16||bytes.slice(-n).some(x=>x!==n))throw new Error('PKCS#7 填充无效');return bytes.slice(0,-n);}
-async function decryptHex(input){
-  const hex=input.replace(/^\/\/.*$/gm,'').trim();
-  try{return JSON.stringify(JSON.parse(hex),null,2);}catch(_){}
-  if(!/^[0-9a-f]+$/i.test(hex))throw new Error('内容既不是 JSON 也不是有效的 hex 加密数据');
-  const markerPos=hex.indexOf('2324');
-  if(markerPos<2||hex.length<markerPos+4+26)throw new Error('文件格式错误：未找到有效的头部标记或数据长度不足');
-  const headerEnd=markerPos+4, header=bytesToText(hexToBytes(hex.slice(0,headerEnd)));
-  if(!header.startsWith('$#')||!header.endsWith('#$'))throw new Error('无效的加密头部');
-  const key=header.slice(2,-2), iv=bytesToText(hexToBytes(hex.slice(-26)));
-  if(new TextEncoder().encode(iv).length!==13)throw new Error('密文末尾的 Iv 无效');
-  const cipherHex=hex.slice(headerEnd,-26); if(!cipherHex||cipherHex.length%32)throw new Error('密文长度无效');
-  const cryptoKey=await crypto.subtle.importKey('raw',padded16(key,'Key'),{name:'AES-CBC'},false,['decrypt']);
-  const plain=await crypto.subtle.decrypt({name:'AES-CBC',iv:padded16(iv,'Iv')},cryptoKey,hexToBytes(cipherHex));
-  return JSON.stringify(JSON.parse(bytesToText(pkcs7Unpad(new Uint8Array(plain)))),null,2);
-}
-async function encryptJson(input){
-  const data=JSON.parse(input.replace(/^\/\/.*$/gm,'').trim());
-  const key=$('key').value||DEFAULT_KEY, iv=$('iv').value||DEFAULT_IV;
-  const keyBytes=padded16(key,'Key');
-  if(new TextEncoder().encode(iv).length!==13)throw new Error('Iv 必须为 13 个 ASCII 字符（密文格式从末尾读取 Iv）');
-  const cryptoKey=await crypto.subtle.importKey('raw',keyBytes,{name:'AES-CBC'},false,['encrypt']);
-  const plain=pkcs7Pad(new TextEncoder().encode(JSON.stringify(data)));
-  const encrypted=await crypto.subtle.encrypt({name:'AES-CBC',iv:padded16(iv,'Iv')},cryptoKey,plain);
-  return textToHex(`$#${key}#$`)+bytesToHex(encrypted)+textToHex(iv);
-}
-async function fetchContent(url){const response=await fetch(url);if(!response.ok)throw new Error(`HTTP ${response.status} ${response.statusText}`);return await response.text();}
-function download(content,filename){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));a.download=filename||'output.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-async function getInput(){if($('text').value.trim())return $('text').value;const file=$('file').files[0];if(file)return await file.text();const source=$('source').value.trim();if(/^https?:\/\//i.test(source))return await fetchContent(source);throw new Error('请提供输入内容、文件或 URL');}
-function updateKeyIvVisibility(){$('keyIvFields').style.display=$('mode').value==='enc'?'grid':'none';}
-$('mode').addEventListener('change',updateKeyIvVisibility); updateKeyIvVisibility();
-$('run').addEventListener('click',async()=>{$('run').disabled=true;$('resultPanel').style.display='none';log('处理中…');try{const mode=$('mode').value,input=await getInput();let output,filename=$('name').value.trim();if(mode==='dec'){output=await decryptHex(input);if(!filename||filename==='output.json')filename='output.json';}else if(mode==='enc'){output=await encryptJson(input);if(!filename||filename==='output.json')filename='encrypted.txt';}else{output=input;if(!filename||filename==='output.json')filename='output.txt';}processedResult=output;processedFilename=filename;$('result').value=output;$('resultPanel').style.display='block';log('处理成功，请检查结果后选择上方的“下载结果”或“复制结果”。');}catch(error){log(`处理失败：${error.message}`);}finally{$('run').disabled=false;}});
-$('download').addEventListener('click',()=>{if(processedResult){download(processedResult,processedFilename);log(`已下载：${processedFilename}`);}});
-$('copy').addEventListener('click',async()=>{if(!processedResult)return;try{await navigator.clipboard.writeText(processedResult);}catch(_){$('result').focus();$('result').select();document.execCommand('copy');}log('结果已复制到剪贴板。');});
-</script>
-</body>
-</html>
+const DEFAULT_KEY='1234567890123',DEFAULT_IV='1234567890123';let processedResult='',processedFilename='output.json';const $=id=>document.getElementById(id);
+function applyTheme(t){const d=t==='dark';document.documentElement.classList.toggle('dark',d);$('themeToggle').textContent=d?'☀️ 浅色':'🌙 深色';localStorage.setItem('tvbox-theme',t)}const saved=localStorage.getItem('tvbox-theme');applyTheme(saved==='dark'||(!saved&&matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light');$('themeToggle').onclick=()=>applyTheme(document.documentElement.classList.contains('dark')?'light':'dark');
+function log(x){$('status').textContent=x}function tvboxBytes(v){return new TextEncoder().encode(v)}function tvboxHex(b){return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('')}function tvboxFromHex(h){if(!/^[0-9a-f]+$/i.test(h)||h.length%2)throw Error('Invalid TVBox hex data');return Uint8Array.from(h.match(/../g),x=>parseInt(x,16))}
+function tvboxWord(v){return tvboxBytes((v+'0000000000000000').slice(0,16))}async function tvboxKey(v){return crypto.subtle.importKey('raw',tvboxWord(v),{name:'AES-CBC'},false,['encrypt','decrypt'])}function tvboxJsonValue(t){try{return JSON.parse(t.trim())}catch(_){return t}}
+async function tvboxEncrypt(text,key,iv){if(!key||!iv)throw Error('TVBox encryption requires key and iv');const encrypted=await crypto.subtle.encrypt({name:'AES-CBC',iv:tvboxWord(iv)},await tvboxKey(key),tvboxBytes(JSON.stringify(tvboxJsonValue(text),null,2)));return tvboxHex(tvboxBytes(`$#${key}#$`))+tvboxHex(new Uint8Array(encrypted))+tvboxHex(tvboxBytes(iv))}
+async function tvboxDecrypt(text){const input=text.replace(/^\/\/.*$/gm,'').trim();if(!input)return input;try{return JSON.stringify(JSON.parse(input),null,2)}catch(_){}if(!/^[0-9a-f]+$/i.test(input)||input.length%2)throw Error('内容既不是 JSON 也不是 TVBox hex 数据');const marker=input.indexOf(tvboxHex(tvboxBytes('#$')));if(marker<0)throw Error('未找到 TVBox 头部');const headerEnd=marker+4;if(input.length<headerEnd+26)throw Error('TVBox 加密数据长度不足');const ivHex=input.slice(-26),cipherHex=input.slice(headerEnd,-26),header=new TextDecoder().decode(tvboxFromHex(input.slice(0,headerEnd)));if(!header.startsWith('$#')||!header.endsWith('#$'))throw Error('TVBox 头部无效');const key=header.slice(2,-2),iv=new TextDecoder().decode(tvboxFromHex(ivHex));const decrypted=await crypto.subtle.decrypt({name:'AES-CBC',iv:tvboxWord(iv)},await tvboxKey(key),tvboxFromHex(cipherHex));const decoded=new TextDecoder().decode(decrypted);try{const value=JSON.parse(decoded);return typeof value==='string'?value:JSON.stringify(value,null,2)}catch(_){return decoded}}
+async function fetchContent(url){const r=await fetch(url);if(!r.ok)throw Error(`HTTP ${r.status} ${r.statusText}`);return await r.text()}async function getInput(){if($('text').value.trim())return $('text').value;const f=$('file').files[0];if(f)return await f.text();const s=$('source').value.trim();if(/^https?:\/\//i.test(s))return fetchContent(s);throw Error('请提供输入内容、���件或 URL')}
+function download(c,n){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/plain;charset=utf-8'}));a.download=n||'output.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}function updateFields(){$('keyIvFields').style.display=$('mode').value==='enc'?'grid':'none'}$('mode').onchange=updateFields;updateFields();
+$('run').onclick=async()=>{$('run').disabled=true;$('resultPanel').style.display='none';log('处理中…');try{const m=$('mode').value,i=await getInput();let o,n=$('name').value.trim();if(m==='dec'){o=await tvboxDecrypt(i);if(!n||n==='output.json')n='output.json'}else if(m==='enc'){o=await tvboxEncrypt(i,$('key').value||DEFAULT_KEY,$('iv').value||DEFAULT_IV);if(!n||n==='output.json')n='encrypted.txt'}else{o=i;if(!n||n==='output.json')n='output.txt'}processedResult=o;processedFilename=n;$('result').value=o;$('resultPanel').style.display='block';log('处理成功，请检查结果后下载或复制。')}catch(e){log('处理失败：'+e.message)}finally{$('run').disabled=false}};
+$('download').onclick=()=>{if(processedResult){download(processedResult,processedFilename);log('已下载：'+processedFilename)}};$('copy').onclick=async()=>{if(!processedResult)return;try{await navigator.clipboard.writeText(processedResult)}catch(_){$('result').focus();$('result').select();document.execCommand('copy')}log('结果已复制到剪贴板。')};
+</script></body></html>
