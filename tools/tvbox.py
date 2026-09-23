@@ -1,1 +1,381 @@
-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
+import json
+import os
+import sys
+import gzip
+import base64
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse, quote
+from urllib.request import urlopen, Request
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+
+class 文件加解密器:
+    def __init__(self, key="1234567890123", iv="1234567890123"):
+        self.key = key
+        self.iv = iv
+
+    def 是URL(self, 路径):
+        """判断是否为URL"""
+        try:
+            result = urlparse(路径)
+            return all([result.scheme, result.netloc])
+        except:
+            return False
+
+    def 从URL获取内容(self, url, 处理gzip=True, 处理base64=True):
+        """从URL获取内容，支持gzip和base64解码"""
+        import re
+        try:
+            print(f"正在从URL获取: {url}")
+            # 处理中文域名：对域名部分进行IDNA编码
+            parsed = urlparse(url)
+            if parsed.netloc:
+                # 尝试将域名转换为IDNA编码
+                try:
+                    idna_domain = parsed.netloc.encode('idna').decode('ascii')
+                    url = parsed._replace(netloc=idna_domain).geturl()
+                except:
+                    # 如果IDNA编码失败，尝试对非ASCII字符进行percent编码
+                    encoded_netloc = quote(parsed.netloc, safe='')
+                    url = parsed._replace(netloc=encoded_netloc).geturl()
+
+            req = Request(url, headers={
+                'User-Agent': 'okhttp/3.12.0',
+                'Accept-Encoding': 'gzip, deflate'
+            })
+            with urlopen(req, timeout=30) as response:
+                raw_content = response.read()
+
+                # 检查是否为图片或二进制文件
+                content_type = response.headers.get('Content-Type', '')
+                if content_type.startswith('image/') or content_type.startswith('video/') or content_type.startswith('audio/'):
+                    print(f"  检测到{content_type}类型，尝试提取嵌入的数据...")
+
+            # 检查文件头是否为常见图片格式
+            image_headers = [
+                b'\xff\xd8\xff\xe0',  # JPEG
+                b'\xff\xd8\xff\xe1',  # JPEG
+                b'\x89PNG',           # PNG
+                b'GIF87a',            # GIF
+                b'GIF89a',            # GIF
+                b'BM',                # BMP
+            ]
+            is_image = False
+            for header in image_headers:
+                if raw_content.startswith(header):
+                    is_image = True
+                    break
+
+            # 如果是图片，尝试提取嵌入的base64数据
+            if is_image:
+                print(f"  检测到图片文件，尝试提取嵌入的base64数据...")
+                try:
+                    # 转为文本查找base64数据
+                    text_content = raw_content.decode('latin-1')
+                    # 查找长base64字符串（至少50个字符）
+                    base64_pattern = r'[A-Za-z0-9+/=]{50,}'
+                    match = re.search(base64_pattern, text_content)
+                    if match:
+                        base64_str = match.group(0)
+                        print(f"  找到base64数据，长度: {len(base64_str)}")
+                        decoded = base64.b64decode(base64_str)
+                        # 将解码后的内容转为字符串
+                        for encoding in ['utf-8', 'gbk', 'gb2312', 'latin-1']:
+                            try:
+                                content = decoded.decode(encoding)
+                                print(f"✓ 成功提取图片中的base64数据 ({len(content)} 字节)")
+                                return content
+                            except UnicodeDecodeError:
+                                continue
+                except Exception as e:
+                    print(f"  提取图片数据失败: {e}")
+
+            # 处理gzip解压
+            if 处理gzip:
+                try:
+                    raw_content = gzip.decompress(raw_content)
+                    print(f"  ✓ gzip解压成功")
+                except:
+                    # 不是gzip格式，继续处理
+                    pass
+
+            # 尝试多种编码解码
+            content = None
+            for encoding in ['utf-8', 'gbk', 'gb2312', 'latin-1']:
+                try:
+                    content = raw_content.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+            if content is None:
+                content = raw_content.decode('latin-1')
+
+            # 处理base64解码（仅当内容看起来像base64且不是hex数据时）
+            if 处理base64:
+                # 检查是否为hex数据（只包含0-9, a-f, A-F）
+                stripped = content.strip()
+                is_hex = re.match(r'^[0-9a-fA-F]+$', stripped) is not None
+
+                if not is_hex:
+                    try:
+                        decoded = base64.b64decode(content)
+                        try:
+                            decoded = gzip.decompress(decoded)
+                            print(f"  ✓ base64+gzip解码成功")
+                        except:
+                            print(f"  ✓ base64解码成功")
+                        for encoding in ['utf-8', 'gbk', 'gb2312', 'latin-1']:
+                            try:
+                                content = decoded.decode(encoding)
+                                break
+                            except UnicodeDecodeError:
+                                continue
+                    except:
+                        pass
+
+            print(f"✓ 成功获取URL内容 ({len(content)} 字节)")
+            return content
+        except Exception as e:
+            print(f"✗ 获取URL内容失败: {e}")
+            return None
+
+    def 保存到临时文件(self, 内容, 后缀=".json"):
+        """将内容保存到临时文件"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix=后缀, delete=False, encoding='utf-8') as f:
+            f.write(内容)
+            return f.name
+
+    def 字符串转hex(self, 文本): 
+        return 文本.encode().hex()
+    
+    def hex转字符串(self, hex文本): 
+        return bytes.fromhex(hex文本).decode()
+    
+    def 加密文件(self, 输入文件, 输出文件):
+        """加密单个文件（支持本地文件或URL）"""
+        try:
+            print(f"加密: {输入文件} -> {输出文件}")
+
+            # 判断输入是URL还是本地文件
+            if self.是URL(输入文件):
+                内容 = self.从URL获取内容(输入文件)
+                if 内容 is None:
+                    return False
+                data = json.loads(内容)
+            else:
+                with open(输入文件, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            
+            # AES加密
+            填充key = self.key.ljust(16, '0').encode()
+            填充iv = self.iv.ljust(16, '0').encode()
+            cipher = AES.new(填充key, AES.MODE_CBC, 填充iv)
+            encrypted = cipher.encrypt(pad(json.dumps(data, ensure_ascii=False).encode(), 16))
+            
+            # 数据包装并转Hex
+            header_hex = self.字符串转hex(f"$#{self.key}#$")
+            cipher_hex = encrypted.hex()
+            iv_hex = self.字符串转hex(self.iv)
+            final_hex = header_hex + cipher_hex + iv_hex
+            
+            with open(输出文件, 'w') as f:
+                f.write(final_hex)
+            
+            print(f"✓ 加密成功: {输入文件}")
+            return True
+            
+        except Exception as e:
+            print(f"✗ 加密失败 {输入文件}: {e}")
+            return False
+    
+    def 解密文件(self, 输入文件, 输出文件):
+        """解密单个文件（支持本地文件或URL）"""
+        try:
+            print(f"解密: {输入文件} -> {输出文件}")
+
+            # 判断输入是URL还是本地文件
+            if self.是URL(输入文件):
+                内容 = self.从URL获取内容(输入文件)
+                if 内容 is None:
+                    return False
+                hex数据 = 内容.strip()
+            else:
+                with open(输入文件, 'r', encoding='utf-8') as f:
+                    hex数据 = f.read().strip()
+
+            # 移除JavaScript风格的注释（// 开头的行）
+            import re
+            hex数据 = re.sub(r'^//.*$', '', hex数据, flags=re.MULTILINE).strip()
+
+            # 尝试直接解析为JSON（如果已经是JSON格式）
+            try:
+                data = json.loads(hex数据)
+                with open(输出文件, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                print(f"✓ 直接保存JSON成功: {输入文件}")
+                return True
+            except json.JSONDecodeError:
+                # 不是JSON格式，尝试解密
+                pass
+
+            # 检查是否为有效的hex数据
+            import re
+            if not re.match(r'^[0-9a-fA-F]+$', hex数据):
+                raise ValueError("内容既不是有效的JSON也不是有效的hex加密数据")
+
+            # 解析Hex数据
+            header_marker = self.字符串转hex("#$")
+            header_pos = hex数据.find(header_marker)
+            if header_pos == -1:
+                raise ValueError("文件格式错误，未找到有效的头部标记")
+
+            header_end = header_pos + 4
+            header_hex = hex数据[:header_end]
+            iv_hex = hex数据[-26:]
+            cipher_hex = hex数据[header_end:-26]
+
+            # 提取key和iv
+            real_key = self.hex转字符串(header_hex)[2:-2]
+            real_iv = self.hex转字符串(iv_hex)
+
+            # AES解密
+            填充key = real_key.ljust(16, '0').encode()
+            填充iv = real_iv.ljust(16, '0').encode()
+            cipher = AES.new(填充key, AES.MODE_CBC, 填充iv)
+            decrypted = unpad(cipher.decrypt(bytes.fromhex(cipher_hex)), 16)
+
+            with open(输出文件, 'w', encoding='utf-8') as f:
+                json.dump(json.loads(decrypted.decode()), f, ensure_ascii=False, indent=2)
+
+            print(f"✓ 解密成功: {输入文件}")
+            return True
+
+        except Exception as e:
+            print(f"✗ 解密失败 {输入文件}: {e}")
+            return False
+    
+    def 获取URL内容(self, url, 输出文件):
+        """直接获取URL内容并保存（不进行加密/解密处理）"""
+        try:
+            print(f"获取URL内容: {url} -> {输出文件}")
+
+            内容 = self.从URL获取内容(url)
+            if 内容 is None:
+                return False
+
+            # 移除JavaScript风格的注释（// 开头的行）
+            import re
+            内容 = re.sub(r'^//.*$', '', 内容, flags=re.MULTILINE).strip()
+
+            # 尝试解析为JSON并格式化保存
+            try:
+                data = json.loads(内容)
+                with open(输出文件, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                print(f"✓ 获取并保存JSON成功: {输出文件}")
+                return True
+            except json.JSONDecodeError:
+                # 不是JSON格式，直接保存原始内容
+                with open(输出文件, 'w', encoding='utf-8') as f:
+                    f.write(内容)
+                print(f"✓ 获取并保存内容成功: {输出文件}")
+                return True
+
+        except Exception as e:
+            print(f"✗ 获取URL内容失败 {url}: {e}")
+            return False
+
+    def 批量处理(self, 输入目录, 输出目录, 模式="enc"):
+        """批量处理目录中的文件或URL，保持原文件名"""
+        输出路径 = Path(输出目录)
+
+        文件列表 = []
+
+        # 判断输入是否为URL
+        if self.是URL(输入目录):
+            文件列表 = [输入目录]
+        else:
+            输入路径 = Path(输入目录)
+            if 输入路径.is_file():
+                文件列表 = [输入路径]
+            else:
+                # 只有当输入是目录时，才创建输出目录
+                输出路径.mkdir(parents=True, exist_ok=True)
+                文件列表 = [f for f in 输入路径.iterdir() if f.is_file()]
+
+        if not 文件列表:
+            print(f"在 {输入目录} 中未找到文件")
+            return
+
+        print(f"找到 {len(文件列表)} 个文件进行处理...")
+
+        成功计数 = 0
+        for 输入文件 in 文件列表:
+            # 处理输出文件名
+            if isinstance(输入文件, str) and self.是URL(输入文件):
+                # 如果输出路径是文件（不是目录），直接使用它
+                if isinstance(输入文件, str) and self.是URL(输入文件):
+                    输出文件 = 输出路径
+                else:
+                    # 从URL提取文件名，如果没有则使用默认名称
+                    url_path = urlparse(输入文件).path
+                    文件名 = Path(url_path).name if url_path else "output.json"
+                    输出文件 = 输出路径 / 文件名
+                    输出文件.parent.mkdir(parents=True, exist_ok=True)
+            else:
+                输出文件 = 输出路径 / 输入文件.name
+
+            if 模式 == "get":
+                if self.获取URL内容(str(输入文件), str(输出文件)):
+                    成功计数 += 1
+            elif 模式 == "enc":
+                if self.加密文件(str(输入文件), str(输出文件)):
+                    成功计数 += 1
+            else:
+                if self.解密文件(str(输入文件), str(输出文件)):
+                    成功计数 += 1
+
+        print(f"\n处理完成: 成功 {成功计数}/{len(文件列表)} 个文件")
+
+def main():
+    if len(sys.argv) < 3:
+        print("用法:")
+        print("  单个文件: python tvbox.py 输入文件/URL 输出文件 [模式]")
+        print("  批量处理: python tvbox.py 输入目录/URL 输出目录 [模式] [--batch]")
+        print("模式: enc-加密(默认) / dec-解密 / get-获取URL内容")
+        print("说明: 支持本地文件和URL作为输入源")
+        print("示例:")
+        print("  本地文件加密: python tvbox.py api.json api.json")
+        print("  本地文件解密: python tvbox.py api.json api.json dec")
+        print("  URL获取: python tvbox.py https://example.com/data.txt output.json get")
+        print("  URL解密: python tvbox.py https://example.com/encrypted.txt output.json dec")
+        print("  批量加密: python tvbox.py input_dir output_dir enc --batch")
+        print("  批量解密: python tvbox.py input_dir output_dir dec --batch")
+        sys.exit(1)
+
+    输入路径, 输出路径 = sys.argv[1], sys.argv[2]
+    
+    # 判断模式
+    模式 = sys.argv[3] if len(sys.argv) > 3 else "enc"
+    
+    # 判断是否批量模式
+    批量模式 = len(sys.argv) > 4 and sys.argv[4] == "--batch"
+    
+    加解密器 = 文件加解密器()
+
+    # 自动判断是否为目录或URL
+    输入是URL = 加解密器.是URL(输入路径)
+    输入路径是目录 = os.path.isdir(输入路径) if not 输入是URL else False
+
+    if 批量模式 or 输入路径是目录 or 输入是URL:
+        加解密器.批量处理(输入路径, 输出路径, 模式)
+    else:
+        if 模式 == "enc":
+            加解密器.加密文件(输入路径, 输出路径)
+        else:
+            加解密器.解密文件(输入路径, 输出路径)
+
+if __name__ == "__main__":
+    main()
