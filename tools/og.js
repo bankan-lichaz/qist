@@ -4,14 +4,13 @@ export default {
 
     // 自动识别浏览器编码的 %7C → |
     const mergeValue = searchParams.get("merge");
-    const [mergeRaw, ...globalParts] = mergeValue?.split("#") || [];
+    const [mergeRaw, ...globalParts] = mergeValue?.split("~") || [];
     if (!mergeRaw) {
       return new Response("Missing merge parameter");
     }
 
-    // 全局参数使用 # 分隔，例如：
-    // ?merge=url1,url2%23include=央视%23dedupe=1
-    // 注意：URL 中的 # 是 fragment，发送请求时不会传给 Worker，需编码为 %23。
+    // 全局参数使用 ~ 分隔，例如：
+    // ?merge=url1,url2~include=央视~dedupe=1
     const globalParams = new URLSearchParams(globalParts.join("&"));
     const g_include = globalParams.get("include");
     const g_exclude = globalParams.get("exclude");
