@@ -116,6 +116,50 @@ export default {
       return out.join("\n");
     }
 
+    // 从 JSON 中提取字段。json=video 会递归查找 video，
+    // 因此可以处理示例中的 data.video；也支持 json=data.video。
+    function extractJsonValue(text, path) {
+      try {
+        const data = JSON.parse(text.replace(/^\uFEFF/, "").trim());
+        const keys = path.split(".").filter(Boolean);
+
+        if (keys.length > 1) {
+          let value = data;
+          for (const key of keys) {
+            if (value === null || value === undefined ||
+                !Object.prototype.hasOwnProperty.call(Object(value), key)) {
+              return "";
+            }
+            value = value[key];
+          }
+          return value === null || value === undefined
+            ? ""
+            : typeof value === "object" ? JSON.stringify(value) : String(value);
+        }
+
+        function findValue(value, key) {
+          if (value === null || value === undefined || typeof value !== "object") {
+            return undefined;
+          }
+          if (Object.prototype.hasOwnProperty.call(value, key)) {
+            return value[key];
+          }
+          for (const child of Object.values(value)) {
+            const found = findValue(child, key);
+            if (found !== undefined) return found;
+          }
+          return undefined;
+        }
+
+        const value = findValue(data, keys[0]);
+        return value === null || value === undefined
+          ? ""
+          : typeof value === "object" ? JSON.stringify(value) : String(value);
+      } catch (e) {
+        return "";
+      }
+    }
+
     // 多正则过滤（OR）
     function applyRegexOR(lines, regexList) {
       return lines.filter(line => regexList.some(reg => reg.test(line)));
@@ -135,6 +179,11 @@ export default {
     // 单源独立处理
     function processSingleSource(text, params) {
       text = tryDecrypt(text, params.decrypt, params.key);
+
+      if (params.json) {
+        text = extractJsonValue(text, params.json);
+      }
+
       if (params.m3u) text = convertM3UtoTXT(text);
 
       let lines = text.split("\n");
@@ -203,11 +252,13 @@ export default {
         dedupe: false,
         regex: null,
         regex_replace: null,
-        m3u: false
+        m3u: false,
+        json: null
       };
 
       for (let i = 1; i < parts.length; i++) {
-        const [k, v] = parts[i].split("=");
+        const [k, ...valueParts] = parts[i].split("=");
+        const v = valueParts.join("=");
         if (k === "decrypt") params.decrypt = v === "1";
         if (k === "key") params.key = v;
         if (k === "include") params.include = v;
@@ -220,6 +271,7 @@ export default {
         if (k === "regex") params.regex = v;
         if (k === "regex_replace") params.regex_replace = v;
         if (k === "m3u") params.m3u = v === "1";
+        if (k === "json") params.json = v;
       }
 
       return { url, params };
