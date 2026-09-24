@@ -3,23 +3,27 @@ export default {
     const { searchParams } = new URL(request.url);
 
     // 自动识别浏览器编码的 %7C → |
-    const mergeRaw = searchParams.get("merge")?.replace(/%7C/gi, "|");
+    const mergeValue = searchParams.get("merge");
+    const [mergeRaw, ...globalParts] = mergeValue?.split("#") || [];
     if (!mergeRaw) {
       return new Response("Missing merge parameter");
     }
 
-    // 全局参数
-    const g_include = searchParams.get("include");
-    const g_exclude = searchParams.get("exclude");
-    const g_group = searchParams.get("group");
-    const g_strip = searchParams.get("strip") === "1";
-    const g_dedupe = searchParams.get("dedupe") === "1";
-    const g_start = parseInt(searchParams.get("start")) || 1;
-    const g_end = searchParams.get("end") ? parseInt(searchParams.get("end")) : null;
-    const g_decrypt = searchParams.get("decrypt") === "1";
-    const g_key = searchParams.get("key") || "";
-    const g_regex = searchParams.get("regex");
-    const g_regex_replace = searchParams.get("regex_replace");
+    // 全局参数使用 # 分隔，例如：
+    // ?merge=url1,url2%23include=央视%23dedupe=1
+    // 注意：URL 中的 # 是 fragment，发送请求时不会传给 Worker，需编码为 %23。
+    const globalParams = new URLSearchParams(globalParts.join("&"));
+    const g_include = globalParams.get("include");
+    const g_exclude = globalParams.get("exclude");
+    const g_group = globalParams.get("group");
+    const g_strip = globalParams.get("strip") === "1";
+    const g_dedupe = globalParams.get("dedupe") === "1";
+    const g_start = parseInt(globalParams.get("start")) || 1;
+    const g_end = globalParams.get("end") ? parseInt(globalParams.get("end")) : null;
+    const g_decrypt = globalParams.get("decrypt") === "1";
+    const g_key = globalParams.get("key") || "";
+    const g_regex = globalParams.get("regex");
+    const g_regex_replace = globalParams.get("regex_replace");
 
     // ⭐ TVBox UA 模拟
     async function fetchTxt(u) {
@@ -168,7 +172,7 @@ export default {
     }
 
     // 解析 merge 参数
-    const sources = mergeRaw.split(",").map(item => {
+    const sources = mergeRaw.replace(/%7C/gi, "|").split(",").map(item => {
       const parts = item.split("|");
       const url = parts[0];
       let params = {
