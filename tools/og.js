@@ -1,9 +1,26 @@
 export default {
   async fetch(request) {
-    const { searchParams } = new URL(request.url);
+    const requestUrl = new URL(request.url);
+    const { searchParams } = requestUrl;
+
+    // merge 内部的 URL 可能包含未编码的 &，因此不能直接使用 searchParams.get("merge")。
+    // 以 ~ 作为全局参数分隔符，先从原始 query 中取出完整的 merge 内容。
+    const rawQuery = requestUrl.search.slice(1);
+    const rawMergeMatch = rawQuery.match(/(?:^|&)merge=([^~]*)/);
+    let mergeValue = rawMergeMatch
+      ? rawMergeMatch[1]
+      : searchParams.get("merge");
+
+    if (mergeValue !== null) {
+      try {
+        // 兼容 merge 内 URL 中的 %26、%7C 等编码字符。
+        mergeValue = decodeURIComponent(mergeValue.replace(/\+/g, "%20"));
+      } catch (e) {
+        // URL 编码不完整时保留原始值，避免整个请求失败。
+      }
+    }
 
     // 自动识别浏览器编码的 %7C → |
-    const mergeValue = searchParams.get("merge");
     const [mergeRaw, ...globalParts] = mergeValue?.split("~") || [];
     if (!mergeRaw) {
       return new Response("Missing merge parameter");
