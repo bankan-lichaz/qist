@@ -26,12 +26,13 @@ jobs:
           ref: master
 
       # 2. 创建目录并下载spider.jar
-      - name: 下载spider.jar&fan.txt
+      - name: 下载spider.jar&fan.txt&pg.jar
         run: |
           set -e # 命令执行失败立即退出
           mkdir -p jar # 确保jar目录存在
           curl -f -L --retry 3 --retry-delay 5 -o jar/spider.jar https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/spider.jar
           curl -f -L --retry 3 --retry-delay 5 -o jar/fan.txt https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/fan.txt
+          curl -f -L --retry 3 --retry-delay 5 -o jar/pg.jar https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/pg.jar
 
       # 3. 配置Git提交信息（使用官方机器人账号，不会计入个人提交贡献）
       - name: 配置Git用户信息
@@ -47,7 +48,7 @@ jobs:
       
           if [ -n "$(git status --porcelain jar/)" ]; then
             git add jar/
-            git commit -m "chore: 自动更新spider.jar和fan.txt"
+            git commit -m "chore: 自动更新spider.jar，fan.txt和pg.jar"
       
             # Integrate the current remote master before pushing
             git pull --rebase origin master
