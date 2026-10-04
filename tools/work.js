@@ -182,6 +182,9 @@ export default {
 
       if (params.json) {
         text = extractJsonValue(text, params.json);
+        if (typeof text === "string" && (text.startsWith("http://") || text.startsWith("https://"))) {
+          return { redirect: text };
+        }
       }
 
       if (params.m3u) text = convertM3UtoTXT(text);
@@ -233,7 +236,7 @@ export default {
         lines = [...new Set(lines)];
       }
 
-      return lines.filter(line => line.trim() !== "");
+      return { lines: lines.filter(line => line.trim() !== "") };
     }
 
     // 解析 merge 参数
@@ -282,7 +285,15 @@ export default {
     for (let src of sources) {
       let raw = await fetchTxt(src.url);
       let processed = processSingleSource(raw, src.params);
-      finalLines.push(...processed);
+
+      if (processed.redirect) {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: processed.redirect }
+        });
+      }
+
+      finalLines.push(...processed.lines);
     }
 
     // 全局处理（不包含 m3u）
