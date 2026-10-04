@@ -1,5 +1,5 @@
 # 工作流名称
-name: 自动更新spider.jar&fan.txt
+name: 自动更新spider.jar&fan.txt&pg.jar
 
 # 触发条件：定时任务 + 手动触发
 on:
