@@ -15,6 +15,13 @@
       "api": "./cctv.py",
       "ext": "./cctv.json",
       "timeout": 20
+    },
+    {
+      "name": "央视频PY直播",
+      "url": "http://127.0.0.1:19876",
+      "api": "./ysp.py",
+      "ext": "./ysp.json",
+      "timeout": 30
     }
   ]
 }
