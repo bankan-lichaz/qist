@@ -3150,7 +3150,7 @@ for _s in FORCE_BK:
     if _s in CHANNEL_MAP:
         CHANNEL_MAP[_s].mode = 'bk'
 
-server_port: int = 8767
+server_port: int = 20122
 server_start_time = time.time()
 resolver: Resolver | None = None
 _resolver_ready: bool = False
@@ -3668,7 +3668,7 @@ except Exception:
 def main():
     global resolver, server_port, engine_port, global_channel_dir, global_ts_cache
     ap = argparse.ArgumentParser(description='央视频全频道直播代理（ysp-live v9.0 旗舰单端口版）')
-    ap.add_argument('port', nargs='?', type=int, default=8767, help='监听端口 (默认 8767)')
+    ap.add_argument('port', nargs='?', type=int, default=20122, help='监听端口 (默认 20122)')
     ap.add_argument('--bind', default='0.0.0.0', help='监听地址 (默认 0.0.0.0)')
     ap.add_argument('--data-dir', default=os.environ.get('YSP_DATA_DIR', ''), help='数据持久化目录 (默认由 YSP_DATA_DIR 环境变量或脚本所在目录决定)')
     ap.add_argument('--cache-mb', type=int, default=200, help='TS 分片内存缓存大小 (MB, 默认 200)')
