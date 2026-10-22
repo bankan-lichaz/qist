@@ -1308,12 +1308,29 @@ class Spider(SpiderBase):
         super(Spider, self).__init__()
         self.brandActor = "📺 央视频直播"
         self.brandDirector = "ysp-live-multi"
+        self._live_mode = "m3u"
 
     def init(self, extend=""):
-        try: _ensure_local_server()
-        except Exception as e: _log('本地服务失败: %s' % e)
-        try: _ensure_logo_source(wait=0)
-        except Exception: pass
+        # 兼容直播源外部传参：ext={"live":"txt"} 或 ext={"live":"m3u"}
+        try:
+            ext = json.loads(extend) if extend else {}
+        except Exception:
+            ext = {}
+
+        if isinstance(ext, dict):
+            mode = str(ext.get("live", "m3u")).strip().lower()
+            if mode in ("txt", "m3u"):
+                self._live_mode = mode
+
+        try:
+            _ensure_local_server()
+        except Exception as e:
+            _log('本地服务失败: %s' % e)
+
+        try:
+            _ensure_logo_source(wait=0)
+        except Exception:
+            pass
         return True
 
     def getName(self): return "央视频直播"
@@ -1443,15 +1460,35 @@ class Spider(SpiderBase):
         }
 
     def liveContent(self, url=None):
-        """兼容 TVBox 直播源调用：返回频道 M3U 列表。"""
+        # 兼容 url 形式：ysp://all / ysp://cctv1 / ysp://xxx
+        raw = (url or "").strip()
+        target = None
+        if raw:
+            raw2 = raw.replace("ysp://", "", 1)
+            raw2 = raw2.split("?", 1)[0].split("/", 1)[0]
+            target = raw2 if raw2 else None
+
         try:
             port = _ensure_local_server()
         except Exception:
             port = _LOCAL_PORT
         if not port:
             return ""
-        out = ['#EXTM3U']
+
+        # TXT 模式
+        if self._live_mode == "txt":
+            lines = []
+            for slug, name, _si, _p, _d, _y in CHANNELS:
+                if target and slug != target and slug + YSPTP_SLUG_SUFFIX != target:
+                    continue
+                lines.append("%s,http://127.0.0.1:%d/%s.m3u8" % (name, port, slug))
+            return "\n".join(lines) + ("\n" if lines else "")
+
+        # 默认 M3U 模式
+        out = ["#EXTM3U"]
         for slug, name, _si, _p, _d, _y in CHANNELS:
+            if target and slug != target and slug + YSPTP_SLUG_SUFFIX != target:
+                continue
             group = '央视频'
             if slug.startswith('cgtn'):
                 group = 'CGTN'
@@ -1477,7 +1514,6 @@ class Spider(SpiderBase):
 
     def action(self, action): return {"msg": "ok"}
     def localProxy(self, params): return [404, "text/plain; charset=utf-8", "Proxy not configured"]
-
 
 if __name__ == '__main__':
     import argparse, sys
