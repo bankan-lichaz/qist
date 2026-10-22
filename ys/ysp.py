@@ -317,7 +317,7 @@ def bk_playurls(channel_id, live_pid, defn='fhd'):
     if isinstance(bu, list):
         for it in bu: urls.append(it if isinstance(it, str) else (it.get('url') or it.get('playurl') or ''))
     elif isinstance(bu, str):
-        urls += [x for x in re.split(r'[;,]', bu) if x.strip()]
+        urls += [x for x in re.split(r'[;,:]', bu) if x.strip()]
     urls = [u for u in dict.fromkeys(urls) if u and '.cctv.' in u]
     if not urls: raise RuntimeError('no playurl')
     urls.sort(key=lambda u: (0 if 'bklive-' in u else 1, u))
@@ -1442,6 +1442,37 @@ class Spider(SpiderBase):
             "header": {"User-Agent": UA, "Referer": "https://live.cctv.cn/"},
         }
 
+    def liveContent(self, url=None):
+        target = None
+        raw = str(url or '').strip()
+        if raw:
+            raw = raw.replace('ysp://', '', 1)
+            if raw and raw not in ('all', '*'):
+                target = raw.split('/', 1)[0].split('?', 1)[0]
+        try:
+            port = _ensure_local_server()
+        except Exception:
+            port = _LOCAL_PORT
+        if not port:
+            return ""
+        out = ['#EXTM3U']
+        items = CHANNELS if target is None else [c for c in CHANNELS if c[0] == target or c[0] + YSPTP_SLUG_SUFFIX == target]
+        if not items:
+            return '#EXTM3U\n'
+        for slug, name, _si, _p, _d, _y in items:
+            group = '央视频'
+            if slug.startswith('cgtn'):
+                group = 'CGTN'
+            elif slug.endswith('ws') or slug == 'cetv1' or slug == 'guoxue':
+                group = '卫视频道'
+            elif slug in ('cctvfyjc', 'cctvdyjc', 'cctvhjjc'):
+                group = '付费剧场'
+            elif slug in ('cctv4k', 'cctv8k', 'cctv164k'):
+                group = '4K超清'
+            out.append('#EXTINF:-1 tvg-id="%s" tvg-name="%s" group-title="%s",%s' % (slug, name, group, name))
+            out.append('http://127.0.0.1:%d/%s.m3u8' % (port, slug))
+        return '\n'.join(out) + '\n'
+
     def searchContent(self, key, quick, pg="1"):
         del quick, pg
         key = (key or "").strip().lower()
@@ -1453,7 +1484,6 @@ class Spider(SpiderBase):
         return {"page": 1, "pagecount": 1, "limit": len(cards), "total": len(cards), "list": cards}
 
     def action(self, action): return {"msg": "ok"}
-    def liveContent(self): return ""
     def localProxy(self, params): return [404, "text/plain; charset=utf-8", "Proxy not configured"]
 
 
