@@ -317,7 +317,7 @@ def bk_playurls(channel_id, live_pid, defn='fhd'):
     if isinstance(bu, list):
         for it in bu: urls.append(it if isinstance(it, str) else (it.get('url') or it.get('playurl') or ''))
     elif isinstance(bu, str):
-        urls += [x for x in re.split(r'[;,]', bu) if x.strip()]
+        urls += [x for x in re.split(r'[;,:]', bu) if x.strip()]
     urls = [u for u in dict.fromkeys(urls) if u and '.cctv.' in u]
     if not urls: raise RuntimeError('no playurl')
     urls.sort(key=lambda u: (0 if 'bklive-' in u else 1, u))
@@ -1443,7 +1443,6 @@ class Spider(SpiderBase):
         }
 
     def liveContent(self, url=None):
-        """兼容 TVBox 直播源调用：返回频道 M3U 列表。"""
         try:
             port = _ensure_local_server()
         except Exception:
