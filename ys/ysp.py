@@ -1442,7 +1442,8 @@ class Spider(SpiderBase):
             "header": {"User-Agent": UA, "Referer": "https://live.cctv.cn/"},
         }
 
-    def liveContent(self, url):
+    def liveContent(self, url=None):
+        """兼容 TVBox 直播源调用：返回频道 M3U 列表。"""
         try:
             port = _ensure_local_server()
         except Exception:
@@ -1475,7 +1476,6 @@ class Spider(SpiderBase):
         return {"page": 1, "pagecount": 1, "limit": len(cards), "total": len(cards), "list": cards}
 
     def action(self, action): return {"msg": "ok"}
-    def liveContent(self): return ""
     def localProxy(self, params): return [404, "text/plain; charset=utf-8", "Proxy not configured"]
 
 
