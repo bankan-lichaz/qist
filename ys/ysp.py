@@ -1152,6 +1152,26 @@ _LOCAL_PORT = None
 _LOCAL_LOCK = threading.Lock()
 
 
+def build_all_m3u(port=None):
+    if port is None:
+        try:
+            port = _ensure_local_server()
+        except Exception:
+            port = _LOCAL_PORT
+    if not port:
+        return ""
+    out = ['#EXTM3U']
+    for slug, name, _si, _p, _d, _y in CHANNELS:
+        group = '央视频道'
+        if slug.startswith('cgtn'):
+            group = 'CGTN'
+        elif slug.endswith('ws') or slug == 'cetv1' or slug == 'guoxue':
+            group = '卫视频道'
+        out.append('#EXTINF:-1 tvg-id="%s" tvg-name="%s" group-title="%s",%s' % (slug, name, group, name))
+        out.append('http://127.0.0.1:%d/%s.m3u8' % (port, slug))
+    return '\n'.join(out) + '\n'
+
+
 class _LocalHandler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
     server_version = 'ysp-live-spider'
@@ -1175,6 +1195,7 @@ class _LocalHandler(BaseHTTPRequestHandler):
     def do_HEAD(self):
         path = urllib.parse.urlparse(self.path).path
         for pat, ct in [(r'^/[\w]+\.m3u8$', 'application/vnd.apple.mpegurl'),
+                        (r'^/all\.m3u$', 'application/vnd.apple.mpegurl'),
                         (r'^/logo/[\w]+\.png$', 'image/png')]:
             if re.match(pat, path):
                 self.send_response(200); self.send_header('Content-Type', ct); self.end_headers(); return
@@ -1192,6 +1213,8 @@ class _LocalHandler(BaseHTTPRequestHandler):
             lines.append('logo_source=%s' % (_LOGO_BASE or '(none)'))
             lines.append('aes_backend=%s' % (_AES_BACKEND or 'unknown'))
             self._send(200, '\n'.join(lines) + '\n'); return
+        if path == '/all.m3u':
+            self._serve_all_m3u(); return
 
         m = re.match(r'^/logo/([\w]+)\.png$', path)
         if m: self._serve_logo(m.group(1)); return
@@ -1200,6 +1223,24 @@ class _LocalHandler(BaseHTTPRequestHandler):
         m = re.match(r'^/chunk/([\w]+)/(\d+)\.ts$', path)
         if m: self._serve_chunk(m.group(1), int(m.group(2))); return
         self._send(404, 'not found\n')
+
+    def _serve_all_m3u(self):
+        try:
+            port = _ensure_local_server()
+        except Exception:
+            port = _LOCAL_PORT
+        if not port:
+            self._send(503, 'server not ready\n'); return
+        out = ['#EXTM3U']
+        for slug, name, _si, _p, _d, _y in CHANNELS:
+            group = '央视频道'
+            if slug.startswith('cgtn'):
+                group = 'CGTN'
+            elif slug.endswith('ws') or slug == 'cetv1' or slug == 'guoxue':
+                group = '卫视频道'
+            out.append('#EXTINF:-1 tvg-id="%s" tvg-name="%s" group-title="%s",%s' % (slug, name, group, name))
+            out.append('http://127.0.0.1:%d/%s.m3u8' % (port, slug))
+        self._send(200, '\n'.join(out) + '\n', 'application/vnd.apple.mpegurl')
 
     def _serve_logo(self, slug):
         base = slug[:-len(YSPTP_SLUG_SUFFIX)] if slug.endswith(YSPTP_SLUG_SUFFIX) else slug
@@ -1450,16 +1491,7 @@ class Spider(SpiderBase):
             port = _LOCAL_PORT
         if not port:
             return ""
-        out = ['#EXTM3U']
-        for slug, name, _si, _p, _d, _y in CHANNELS:
-            group = '央视频道'
-            if slug.startswith('cgtn'):
-                group = 'CGTN'
-            elif slug.endswith('ws') or slug == 'cetv1' or slug == 'guoxue':
-                group = '卫视频道'
-            out.append('#EXTINF:-1 tvg-id="%s" tvg-name="%s" group-title="%s",%s' % (slug, name, group, name))
-            out.append('http://127.0.0.1:%d/%s.m3u8' % (port, slug))
-        return '\n'.join(out) + '\n'
+        return build_all_m3u(port)
 
     def searchContent(self, key, quick, pg="1"):
         del quick, pg
