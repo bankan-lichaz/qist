@@ -1,98 +1,54 @@
-// Cloudflare Worker entry point: tb.py processing plus wk.js-compatible TVBox AES-CBC.
-// TVBox parameters are global query parameters:
-//   ?source=<url>|...&tvbox=1&tvboxKey=<key>&tvboxIv=<iv>  encrypt response
-//   ?source=<url>|...&tvbox=0                              decrypt response (key/IV are read from payload)
-// Core source fetching/filtering remains in tb-worker.js.
-import core from "./tb-worker.js";
+// Cloudflare Workers module port of ys/tb.py.
+// Source format: ?source=<url1>|option=value|flag,<url2>|option=value&globalOption=value
+// Commas separate sources; pipes separate one source's options; ampersands separate query/global options.
 
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+const RAW_BASE = "https://gh-proxy.com/https://raw.githubusercontent.com/bankan-lichaz/Ku9-IPTV-source/refs/heads/main/zubo/";
+const SOURCE_NAMES = `GENRE HPTYJ DLudp DLrtp SYLNT template MBST SHLT HNLT CDDX MYDX1 CQDX CQLT QHDX GDDX HuBDX HuNDX BJLT1 SXDX SHLT1 HZDX1 AHDX JXDX SCYD XJDX NMGDX SDLT HeBDX NEWL BJDX SSXDX1 TJLT HeBLT HLJLT NMGDX HNDX HNLT1 JSDX KSSC KSSC1 SCLT KSSC2 HTML KSSC3 TW4G XYMM BJYD NEWTV HSJC BJYD1 WEBV HKZB HKZB1 WEBV1 DYZB GOBK1 NHZB JCPD JCMG YSDX WSHZ SZHZ DYZB1 BFGD EYHT1 EYHT2 EYHT3 EYHT4 EYWS IHOT SCDX SYLT EYHT5 FJLT EYHT5a YNDX SHDX JLLT SDDX SXLT GDYD GXDX ZJDX HiNDX HiNLT GZDX FJDX NMDX NMLT JLDX TJDX ZJLT LNYD HuBXYDX`.split(" ");
+const URL_DICT = Object.fromEntries(SOURCE_NAMES.map((name, i) => [String(i), RAW_BASE + name]));
+URL_DICT["94"] = "https://bov.lichaz.de5.net/?merge=https://raw.githubusercontent.com/bankan-lichaz/Ku9-IPTV-source/refs/heads/main/zubo/template|regex_replace=/$/&key=your_secret_key_he2026033723/";
+URL_DICT["95"] = RAW_BASE + "FYAO";
+URL_DICT["96"] = "https://bow.lichaz.de5.net/?merge=https://raw.githubusercontent.com/bankan-lichaz/qist/refs/heads/main/Dzone/D1|decrypt=1|key=youguess|regex_replace=/^\/\/.*//,https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/dianshi.json|include=热播;奇乐;爱看;咕噜;飞宇;一起;半日;韩圈;茉莉;不戳;魔方;王子;独播;瓜子影视;面包;永乐;1905;番社;双星99;咕咕;蓝鹰;贝乐虎;围观;瓜子体育;88看球;山楂;爱看机器人;戏曲多多;悠悠;永乐|exclude=flag;User-Agent|regex_replace=/\s{4}//,https://raw.githubusercontent.com/bankan-lichaz/qist/refs/heads/main/Dzone/D3|decrypt=1|key=youguess|regex_replace=/^\/\/.*//";
+URL_DICT["97"] = "https://bow.lichaz.de5.net/?merge=https://boz.lichaz.de5.net/?merge=https://boy.lichaz.de5.net/my_pro@multiurl&tvbox=1&tvboxKey=123456&tvboxIv=1790028633784";
+URL_DICT["98"] = RAW_BASE + "YSPL";
+URL_DICT["99"] = RAW_BASE + "template1";
+URL_DICT["100"] = RAW_BASE + "template2";
 
-function word(value) {
-  return encoder.encode((String(value) + "0000000000000000").slice(0, 16));
-}
-function toHex(bytes) {
-  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
-}
-function fromHex(hex) {
-  if (!/^[\da-f]+$/i.test(hex) || hex.length % 2) throw new Error("Invalid TVBox hex data");
-  return Uint8Array.from(hex.match(/../g), pair => parseInt(pair, 16));
-}
-async function importAesKey(key) {
-  return crypto.subtle.importKey("raw", word(key), { name: "AES-CBC" }, false, ["encrypt", "decrypt"]);
-}
-function jsonValue(value) {
-  try { return JSON.parse(value.trim()); } catch { return value; }
-}
-async function tvboxEncrypt(value, key, iv) {
-  if (!key || !iv) throw new Error("TVBox encryption requires tvboxKey and tvboxIv");
-  const plain = JSON.stringify(jsonValue(value), null, 2);
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-CBC", iv: word(iv) }, await importAesKey(key), encoder.encode(plain));
-  return toHex(encoder.encode(`$#${key}#$`)) + toHex(new Uint8Array(encrypted)) + toHex(encoder.encode(iv));
-}
-async function tvboxDecrypt(input) {
-  const value = String(input).replace(/^\/\/.*$/gm, "").trim();
-  if (!value) return value;
-  try { return JSON.stringify(JSON.parse(value), null, 2); } catch {}
-  if (!/^[\da-f]+$/i.test(value) || value.length % 2) throw new Error("Content is neither JSON nor TVBox hex data");
-  const marker = value.indexOf(toHex(encoder.encode("#$")));
-  if (marker < 0) throw new Error("TVBox header was not found");
-  const headerEnd = marker + 4;
-  // wk.js TVBox payloads append a 13-character timestamp/IV value as hex.
-  const ivHexLength = 26;
-  if (value.length < headerEnd + ivHexLength) throw new Error("Invalid TVBox payload");
-  const key = decoder.decode(fromHex(value.slice(0, headerEnd))).slice(2, -2);
-  const iv = decoder.decode(fromHex(value.slice(-ivHexLength)));
-  const cipher = fromHex(value.slice(headerEnd, -ivHexLength));
-  const plain = await crypto.subtle.decrypt({ name: "AES-CBC", iv: word(iv) }, await importAesKey(key), cipher);
-  const decoded = decoder.decode(plain);
-  try {
-    const parsed = JSON.parse(decoded);
-    return typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2);
-  } catch { return decoded; }
-}
+const NORMALIZE_RULES = [
+  [/上海电信/i,"76"],[/北京联通/i,"17"],[/吉林联通/i,"77"],[/四川电信/i,"70"],[/四川移动/i,"23"],[/四川联通/i,"40"],[/天津联通/i,"31"],[/安徽电信/i,"21"],[/山东电信/i,"78"],[/山东联通/i,"26"],[/山西电信/i,"18"],[/山西联通/i,"79"],[/广东电信/i,"14"],[/广东移动/i,"80"],[/广西电信/i,"81"],[/河北电信/i,"27"],[/河北联通/i,"32"],[/��南电信/i,"35"],[/河南联通/i,"36"],[/浙江电信/i,"82"],[/海南电信/i,"83"],[/海南联通/i,"84"],[/湖北电信/i,"15"],[/湖南电信/i,"16"],[/贵州电信/i,"85"],[/辽宁联通/i,"71"],[/重庆电信/i,"11"],[/重庆联通/i,"12"],[/陕西电信/i,"30"],[/青海电信/i,"13"],[/福建联通/i,"73"],
+  [/ZB14/i,"吉林组播"],[/ZB13/i,"广西组播"],[/ZB12/i,"湖南组播"],[/ZB11/i,"内蒙组播"],[/ZB10/i,"山西组播"],[/ZB1/i,"辽宁组播"],[/ZB2/i,"青海组播"],[/ZB3/i,"四川组播"],[/ZB4/i,"山东组播"],[/ZB5/i,"北京组播"],[/ZB6/i,"福建组播"],[/ZB7/i,"安徽组播"],[/ZB8/i,"云南组播"],[/ZB9/i,"海南组播"],
+  [/内蒙卫视/i,"内蒙古卫视"],[/福建公共/i,"福建乡村公共"],[/福建文体/i,"福建文旅体育"],[/重庆时红岩文化/i,"重庆红岩文化"],[/重庆影视剧/i,"重庆影视"],[/陕西1套/i,"陕西新闻资讯"],[/陕西2套/i,"陕西都市青春"],[/银铃/i,"陕西银龄"],[/陕西3套/i,"陕西银龄"],[/陕西5套/i,"陕西秦腔"],[/陕西6套/i,"CHC影迷电影"],[/陕西7套/i,"陕西体育休闲"],[/陕西8套/i,"陕西西部电影"],[/求索纪录/i,"求索纪录"],[/生态环境/i,"生态环境"],[/山东体育/i,"山东体育休闲"],[/吉林综艺/i,"吉林综艺文化"],[/文物宝库|河南收藏天下/i,"文物宝库"],[/河南戏曲/i,"梨园频道"],[/武术世界|河南中华功夫/i,"武术世界"],[/河北农民/i,"河北三农"],[/江苏体育/i,"江苏体育休闲"],[/北京科教/i,"北京纪实科教"],[/央视精品|文化精品/i,"CCTV文化精品"],[/国学/i,"国学频道"],[/天元围棋/i,"天元围棋"],[/茶/i,"茶频道"],[/书画/i,"书画频道"],[/精彩影视/i,"精彩影视"],[/动漫秀场/i,"动漫秀场"],[/游戏风云/i,"游戏风云"],[/法治天地/i,"法治天地"],[/都市剧场/i,"都市剧场"],[/多彩文体/i,"多彩文体"],[/金色学堂/i,"金色学堂"],[/生活时尚/i,"生活时尚"],[/第一财经/i,"第一财经"],[/东方影视/i,"东方影视"],[/财富天下/i,"财富天下"],[/快乐垂钓/i,"快乐垂钓"],[/金鹰纪实/i,"金鹰纪实"],[/金鹰卡通/i,"金鹰卡通"],[/嘉佳卡通/i,"嘉佳卡通"],[/哈哈炫动/i,"哈哈炫动"],[/五星体育/i,"五星体育"],[/梨园/i,"梨园频道"],[/农林/i,"中��农林卫视"],[/家庭理财/i,"家庭理财"],[/新动漫/i,"新动漫"],[/环球旅游/i,"环球旅游"],[/四海钓鱼/i,"四海钓鱼"],[/东方财经/i,"东方财经"],[/乐游/i,"乐游"],[/爱上4K/i,"爱上4K"],[/凤凰.*中文/i,"凤凰中文"],[/凤凰.*资讯/i,"凤凰资讯"],[/四川妇女儿童/i,"四川妇儿"],[/旅游卫视/i,"海南卫视"],[/大湾区/i,"大湾区卫视"],[/福建卫视/i,"东南卫视"],[/上海卫视/i,"东方卫视"],[/CGTN英语/i,"CGTN"],
+  [/^CCTV[-\\s]*少儿$/i,"CCTV14少儿"],[/^CCTV[-\\s]*新闻$/i,"CCTV13新闻"],[/^CCTV[-\\s]*NEWS$/i,"CCTV13新闻"],[/^中国教育[- ]?1(?![\\dA-Za-z]).*$/i,"CETV1"],[/^中国教育[- ]?2(?![\\dA-Za-z]).*$/i,"CETV2"],[/^中国教育[- ]?3(?![\\dA-Za-z]).*$/i,"CETV3"],[/^中国教育[- ]?4(?![\\dA-Za-z]).*$/i,"CETV4"],
+  [/兵器科技/i,"CCTV兵器科技"],[/风云音乐/i,"CCTV风云音乐"],[/第一剧场/i,"CCTV第一剧场"],[/风云足球/i,"CCTV风云足球"],[/风云剧场/i,"CCTV风云剧场"],[/怀旧剧场/i,"CCTV怀旧剧场"],[/女性时尚/i,"CCTV女性时尚"],[/世界地理/i,"CCTV世界地理"],[/央视台球/i,"CCTV央视台球"],[/高.*网/i,"CCTV高尔夫网球"],[/卫生健康/i,"CCTV卫生健康"],[/电视指南/i,"CCTV电视指南"],[/发现之旅/i,"发现之旅"],[/老故事/i,"老故事"],[/中学生/i,"中学生"],[/^CGTN.*录.*/i,"CGTN外语纪录"],[/^CGTN.*阿.*/i,"CGTN阿拉伯语"],[/^CGTN.*西.*/i,"CGTN西班牙语"],[/^CGTN.*法.*/i,"CGTN法语"],[/^CGTN.*俄.*/i,"CGTN俄语"],
+  [/^CETV[- ]?1(?![\\dA-Za-z]).*/i,"CETV1"],[/^CETV[- ]?2(?![\\dA-Za-z]).*/i,"CETV2"],[/^CETV[- ]?3(?![\\dA-Za-z]).*/i,"CETV3"],[/^CETV[- ]?4(?![\\dA-Za-z]).*/i,"CETV4"],[/早.*教/i,"CETV早期教育"],[/^CCTV[- ]?4.*欧洲/i,"CCTV4欧洲"],[/^CCTV[- ]?4.*美洲/i,"CCTV4美洲"],[/^CCTV[- ]?5\\+.*$/i,"CCTV5+体育赛事"],[/^CCTV[- ]?4K.*$/i,"CCTV4K"],[/^CCTV[- ]?8K.*$/i,"CCTV8K"],[/动作电影/i,"CHC动作电影"],[/家庭影院/i,"CHC家庭影院"],[/影迷电影|高清电影/i,"CHC影迷电影"],
+  [/^CCTV[- ]?10.*$/i,"CCTV10科教"],[/^CCTV[- ]?11.*$/i,"CCTV11戏曲"],[/^CCTV[- ]?12.*$/i,"CCTV12社会与法"],[/^CCTV[- ]?13.*$/i,"CCTV13新闻"],[/^CCTV[- ]?14.*$/i,"CCTV14少儿"],[/^CCTV[- ]?15.*$/i,"CCTV15音乐"],[/^CCTV[- ]?16.*$/i,"CCTV16奥林匹克"],[/^CCTV[- ]?17.*$/i,"CCTV17农业农村"],[/^CCTV[- ]?1(?![\\dA-Za-z]).*$/i,"CCTV1综合"],[/^CCTV[- ]?2(?![\\dA-Za-z]).*$/i,"CCTV2财经"],[/^CCTV[- ]?3(?![\\dA-Za-z]).*$/i,"CCTV3综艺"],[/^CCTV[- ]?4(?![\\dA-Za-z]).*$/i,"CCTV4中文国际"],[/^CCTV[- ]?5(?![\\dA-Za-z]).*$/i,"CCTV5体育"],[/^CCTV[- ]?6(?![\\dA-Za-z]).*$/i,"CCTV6电影"],[/^CCTV[- ]?7(?![\\dA-Za-z]).*$/i,"CCTV7国防军事"],[/^CCTV[- ]?8(?![\\dA-Za-z]).*$/i,"CCTV8电视剧"],[/^CCTV[- ]?9(?![\\dA-Za-z]).*$/i,"CCTV9纪录"],
+  ...["北京","东方","湖南","浙江","江苏","广东","山东","东南","深圳","安徽","四川","重庆","天津","湖北","河北","河南","海南","山西","江西","广西","陕西","吉林","黑龙江","辽宁","青海","宁夏","甘肃","贵州","云南","新疆","内蒙古","西藏"].map(n=>[new RegExp(n+"卫视","i"),n+"卫视"])
+];
 
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    const mode = url.searchParams.get("tvbox");
-    const key = url.searchParams.get("tvboxKey") || "";
-    const iv = url.searchParams.get("tvboxIv") || "";
+const text = v => v == null ? "" : String(v);
+const on = v => text(v).trim() === "1";
 
-    const response = await core.fetch(request, env, ctx);
-    if (!response.ok || (mode !== "0" && mode !== "1")) return response;
+function parseSource(spec) {
+  const parts=text(spec).trim().split("|");
+  const url=parts.shift().trim(), params={};
+  for(const p of parts){const s=p.trim();if(!s)continue;const i=s.indexOf("=");const k=(i<0?s:s.slice(0,i)).trim().toLowerCase();params[k]=i<0?"1":s.slice(i+1).trim();}
+  return {url,params};
+}
+function extractSources(search) {
+  const specs=search.getAll("source");
+  if(!specs.length){const one=search.get("url")||search.get("u")||search.get("src");if(one)specs.push(one);}
+  // Comma-separated sources, as in tb.py. Encode literal commas inside a URL as %2C.
+  return specs.flatMap(s=>text(s).split(",").map(parseSource)).filter(s=>s.url);
+}
+function globalParams(search){const p={};for(const [k,v] of search)if(!["source","url","u","src"].includes(k.toLowerCase()))p[k.toLowerCase()]=v;return p;}
+function regexOr(lines,expr){const regs=text(expr).split(";").map(s=>{const m=s.trim().match(/^\/(.*?)\/([a-zA-Z]*)$/);if(!m)return null;try{return new RegExp(m[1],m[2].includes("i")?"i":"");}catch{return null;}}).filter(Boolean);return regs.length?lines.filter(x=>regs.some(r=>r.test(x))):lines;}
+function regexReplace(lines,expr){for(const s of text(expr).split(";")){const m=s.trim().match(/^\/(.*?)\/(.+?)\/$/);if(!m)continue;try{const r=new RegExp(m[1],"g");lines=lines.map(x=>x.replace(r,m[2]));}catch{}}return lines;}
+function cutLines(lines,expr){const out=[];for(const s of text(expr).split(";")){const m=s.trim().match(/^\/(.*?)\/(.+?)\/$/);if(!m)continue;try{const a=new RegExp(m[1]),b=new RegExp(m[2]),start=lines.findIndex(x=>a.test(x)),end=start<0?-1:lines.findIndex((x,i)=>i>=start&&b.test(x));if(start>=0&&end>=start)out.push(...lines.slice(start,end+1));}catch{}}return out;}
+function m3uToTxt(input){const groups=new Map();let group="未分组",name=null;for(const line of text(input).replace(/\r/g,"").trim().split("\n").map(x=>x.trim()).filter(Boolean)){if(line.startsWith("#EXTINF")){const g=line.match(/group-title="([^"]+)"/i),n=line.match(/,(.*)$/);group=g?g[1].trim():"未分组";name=n?n[1].trim():"未知频道";if(!groups.has(group))groups.set(group,[]);}else if(/^https?:\/\//i.test(line)&&name){groups.get(group).push(`${name},${line}`);name=null;}}const out=[];for(const [g,a] of groups)out.push(`${g},#genre#`,...a,"");return out;}
+function normalize(line){const i=line.indexOf(",");if(i<0)return line;const name=line.slice(0,i).trim();for(const [re,v] of NORMALIZE_RULES)if(re.test(name))return v+line.slice(i);return name+line.slice(i);}
+function processSingle(input,p={}){let lines=text(input).split(/\r?\n/).map(x=>x.replace(/\s+$/,""));if(on(p.m3u)||/#EXTM3U|#EXTINF/i.test(text(input))){const converted=m3uToTxt(input);if(converted.length)lines=converted;}if(p.include!=null){const a=text(p.include).split(";").map(x=>x.trim()).filter(Boolean);if(a.length)lines=lines.filter(x=>a.some(v=>x.includes(v)));}if(p.exclude!=null){const a=text(p.exclude).split(";").map(x=>x.trim()).filter(Boolean);if(a.length)lines=lines.filter(x=>!a.some(v=>x.includes(v)));}if(text(p.group).trim())lines=lines.filter(x=>x.includes(text(p.group).trim()));if(p.cut!=null)lines=cutLines(lines,p.cut);if(p.regex!=null)lines=regexOr(lines,p.regex);if(p.regex_replace!=null)lines=regexReplace(lines,p.regex_replace);if(on(p.strip))lines=lines.map(x=>x.split("$")[0]);if(on(p.dedupe))lines=[...new Set(lines)];if(text(p.add).trim())lines.unshift(`${text(p.add).trim()},#genre#`);if(p.start!=null){const n=parseInt(p.start,10);if(n>0)lines=lines.slice(n-1);}if(p.end!=null){const n=parseInt(p.end,10);if(n>=0)lines=lines.slice(0,n);}lines=lines.filter(x=>x.trim());if(on(p.normalize))lines=lines.map(normalize);return lines.join("\n");}
+function xorDecode(input,key){key=text(key).trim();if(!key)throw Error("missing key");const compact=text(input).split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith("//")).join("").replace(/[\t ]/g,"");if(!compact)throw Error("empty cipher");if(!/^[A-Za-z0-9+/=]+$/.test(compact)||compact.length%4)throw Error("not base64");const bytes=Uint8Array.from(atob(compact),c=>c.charCodeAt(0)),decoded=new TextDecoder().decode(bytes);let out="";for(let i=0;i<decoded.length;i++)out+=String.fromCharCode(decoded.charCodeAt(i)^key.charCodeAt(i%key.length));return out;}
+async function fetchText(url){let u;try{u=new URL(url);}catch{throw Error("invalid URL");}if(!["http:","https:"].includes(u.protocol))throw Error("URL must use http or https");const host=u.hostname.toLowerCase();if(host==="localhost"||host.endsWith(".localhost")||host.endsWith(".local")||host==="::1"||host.startsWith("127.")||host.startsWith("10.")||host.startsWith("192.168.")||/^172\.(1[6-9]|2\d|3[01])\./.test(host)||host==="0.0.0.0")throw Error("private network URL is not allowed");const r=await fetch(u.toString(),{headers:{"User-Agent":"Mozilla/5.0"},redirect:"follow"});if(!r.ok)throw Error(`upstream HTTP ${r.status}`);return r.text();}
+async function processMultiurl(input,p){const lines=text(input).split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(normalize),out=[];for(const line of lines){if(!line.includes(","))continue;const parts=line.split(",").map(x=>x.trim()).filter(Boolean);if(parts.length<2)continue;const [key,...reps]=parts;if(key==="0"){for(const rep of reps)out.push(`${rep},#genre#`);continue;}const target=URL_DICT[key]||key;if(!/^https?:\/\//i.test(target))continue;try{const template=await fetchText(target);for(const rep of reps)out.push(...template.replaceAll("mg000",rep).split(/\r?\n/));}catch{/* tb.py skips unavailable templates */}}return out.length?processSingle(out.join("\n"),p):"";}
+async function applyPipeline(input,p){if(on(p.decrypt)&&text(p.key).trim()){try{input=xorDecode(input,p.key);}catch{/* same as tb.py: ignore decrypt errors */}}return on(p.multiurl)?processMultiurl(input,p):processSingle(input,p);}
 
-    try {
-      const body = await response.text();
-      let output;
-      if (mode === "1") {
-        output = await tvboxEncrypt(body, key, iv);
-      } else {
-        try {
-          output = await tvboxDecrypt(body);
-        } catch (wholeBodyError) {
-          // Match wk.js fallback: attempt to decode each line independently.
-          const decodedLines = [];
-          for (const line of body.split(/\r?\n/)) {
-            try { decodedLines.push(await tvboxDecrypt(line)); }
-            catch { decodedLines.push(line); }
-          }
-          output = decodedLines.join("\n");
-          if (output === body) throw wholeBodyError;
-        }
-      }
-      return new Response(output, {
-        status: response.status,
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "Access-Control-Allow-Origin": "*"
-        }
-      });
-    } catch (error) {
-      return new Response("tvbox: " + (error?.message || String(error)), {
-        status: 400,
-        headers: { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-  }
-};
+export default {async fetch(request){if(!["GET","POST"].includes(request.method))return new Response("Method not allowed",{status:405,headers:{Allow:"GET, POST"}});try{const u=new URL(request.url),sources=extractSources(u.searchParams),common=globalParams(u.searchParams);if(request.method==="POST"&&(request.headers.get("content-type")||"").includes("application/json")){const body=await request.json();if(body&&typeof body==="object"&&!Array.isArray(body)){const specs=Array.isArray(body.sources)?body.sources:[body.source||body.url||body.u||body.src].filter(Boolean);sources.push(...specs.flatMap(s=>text(s).split(",").map(parseSource)).filter(s=>s.url));for(const [k,v]of Object.entries(body))if(!["sources","source","url","u","src"].includes(k.toLowerCase())&&v!=null)common[k.toLowerCase()]=String(v);}}if(!sources.length)return new Response("decrypt: missing url/source",{status:400,headers:{"Content-Type":"text/plain; charset=utf-8"}});const results=[];for(const src of sources){const params={...common,...src.params};const raw=await fetchText(src.url);const result=await applyPipeline(raw,params);if(result)results.push(result);}return new Response(results.join("\n"),{status:200,headers:{"Content-Type":"text/plain; charset=utf-8","Access-Control-Allow-Origin":"*"}});}catch(e){return new Response("decrypt: "+(e?.message||String(e)),{status:502,headers:{"Content-Type":"text/plain; charset=utf-8","Access-Control-Allow-Origin":"*"}});}}};
