@@ -4,11 +4,9 @@ import hashlib
 import json
 import re
 import secrets
-import threading
 import time
 from urllib.parse import quote, unquote, urljoin, urlparse
 
-import requests
 from lxml import html
 from base.spider import Spider as BaseSpider
 
@@ -52,34 +50,27 @@ class Spider(BaseSpider):
     def init(self, extend=""):
         self.snapshot_url = extend
         self.uid = base64.b64encode(secrets.token_bytes(18)).decode("ascii")
-        self.epg_cache = {}
-        self.epg_lock = threading.Lock()
-
-    def getName(self):
-        return "央視網"
 
     def liveContent(self, url):
         channels = self._load_channels(url, self.snapshot_url)
-        proxy = self.getProxyUrl() + "&siteKey=" + quote(str(self.siteKey), safe="")
         items = [
-            self._item(channel, number, proxy)
+            self._item(channel, number)
             for number, channel in enumerate(channels, 1)
         ]
-        return json.dumps([{"name": "央視頻道", "channel": items}], ensure_ascii=False)
+        return [{"name": "央視頻道", "channel": items}]
 
-    def localProxy(self, param):
+    def proxy(self, params):
         try:
-            if param.get("type") == "epg":
-                content = self._epg(param.get("id", ""), param.get("date", ""))
+            if params.get("type") == "epg":
+                content = self._epg(params.get("id", ""), params.get("date", ""))
                 return [200, "application/json", content]
-            location = self._resolve(param.get("id", ""))
+            location = self._resolve(params.get("id", ""))
             return [302, "text/plain", "", {"Location": location}]
         except Exception as error:
             return [502, "text/plain", "央視網: " + str(error)]
 
     def destroy(self):
         self.uid = ""
-        self.epg_cache = {}
 
     def _epg(self, channel_id, date):
         if not isinstance(channel_id, str) or not CHANNEL_ID_PATTERN.fullmatch(
@@ -88,13 +79,12 @@ class Spider(BaseSpider):
             raise ValueError("invalid channel id")
         if not isinstance(date, str) or not DATE_PATTERN.fullmatch(date):
             raise ValueError("invalid date")
-        key = (channel_id, date)
-        now = time.monotonic()
-        with self.epg_lock:
-            cached = self.epg_cache.get(key)
-            if cached and now < cached[0]:
-                return cached[1]
-        with requests.get(
+        return self.net.cached("epg:" + channel_id + ":" + date,
+                               {"ttl": EPG_CACHE_SECONDS * 1000, "stale": False},
+                               lambda: self._load_epg(channel_id, date))
+
+    def _load_epg(self, channel_id, date):
+        result = self._get_json(
             EPG_URL,
             params={
                 "c": channel_id,
@@ -102,10 +92,7 @@ class Spider(BaseSpider):
                 "d": date.replace("-", ""),
             },
             headers={"Referer": HOST + "/", "User-Agent": USER_AGENT},
-            timeout=REQUEST_TIMEOUT,
-        ) as response:
-            response.raise_for_status()
-            result = response.json()
+        )
         data = result.get("data") if isinstance(result, dict) else None
         channel = data.get(channel_id) if isinstance(data, dict) else None
         rows = channel.get("list") if isinstance(channel, dict) else None
@@ -129,8 +116,6 @@ class Spider(BaseSpider):
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        with self.epg_lock:
-            self.epg_cache[key] = (now + EPG_CACHE_SECONDS, content)
         return content
 
     @staticmethod
@@ -148,7 +133,7 @@ class Spider(BaseSpider):
             "{}{}{}{}".format(channel_id, timestamp, nonce, PLAY_SECRET).encode("utf-8")
         ).hexdigest()
         auth_key = "{}-{}-{}".format(timestamp, nonce, digest)
-        with requests.get(
+        result = self._get_json(
             PLAY_URL,
             params={
                 "channel": channel_id,
@@ -164,10 +149,7 @@ class Spider(BaseSpider):
                 "User-Agent": USER_AGENT,
                 "X-Requested-With": "XMLHttpRequest",
             },
-            timeout=REQUEST_TIMEOUT,
-        ) as response:
-            response.raise_for_status()
-            result = response.json()
+        )
         if result.get("ack") != "yes":
             raise ValueError("play api rejected channel")
         manifest = result.get("manifest") or {}
@@ -182,19 +164,14 @@ class Spider(BaseSpider):
     def _load_channels(self, url, snapshot_url):
         try:
             return self._fetch_channels(url or CATALOG_URL)
-        except (requests.RequestException, ValueError) as error:
+        except (OSError, ValueError) as error:
             print("央視網 catalog fallback: {}".format(error))
             return self._load_snapshot(snapshot_url)
 
-    @classmethod
-    def _fetch_channels(cls, url):
-        with requests.get(
-            url,
-            headers={"Referer": HOST + "/", "User-Agent": USER_AGENT},
-            timeout=REQUEST_TIMEOUT,
-        ) as response:
-            response.raise_for_status()
-            document = html.fromstring(response.content)
+    def _fetch_channels(self, url):
+        headers = {"Referer": HOST + "/", "User-Agent": USER_AGENT}
+        payload = self._request(url, headers=headers, buffer=3)
+        document = html.fromstring(payload)
         channels = []
         seen = set()
         for anchor in document.xpath("//a[@href]"):
@@ -213,13 +190,10 @@ class Spider(BaseSpider):
             raise ValueError("incomplete channel list")
         return channels
 
-    @staticmethod
-    def _load_snapshot(url):
+    def _load_snapshot(self, url):
         parsed = urlparse(url)
         if parsed.scheme in ("http", "https"):
-            with requests.get(url, timeout=REQUEST_TIMEOUT) as response:
-                response.raise_for_status()
-                result = response.json()
+            result = self._get_json(url)
         elif parsed.scheme in ("", "file"):
             path = unquote(parsed.path if parsed.scheme else url)
             if len(path) > 2 and path[0] == "/" and path[2] == ":":
@@ -233,8 +207,31 @@ class Spider(BaseSpider):
             raise ValueError("invalid channel snapshot")
         return [channel for channel in channels if isinstance(channel, dict)]
 
-    @staticmethod
-    def _item(channel, number, proxy):
+    def _get_json(self, url, params=None, headers=None):
+        options = {"headers": headers or {}, "timeout": REQUEST_TIMEOUT * 1000}
+        if params:
+            options["params"] = params
+        try:
+            return self.net.json(url, options)
+        except Exception as error:
+            raise ValueError(str(error)) from None
+
+    def _request(self, url, params=None, headers=None, buffer=0):
+        options = {
+            "headers": headers or {},
+            "timeout": REQUEST_TIMEOUT * 1000,
+            "buffer": buffer,
+        }
+        if params:
+            options["params"] = params
+        result = self.net.req(url, options)
+        if result.get("error"):
+            raise OSError(str(result["error"]))
+        if result["code"] >= 400:
+            raise ValueError("HTTP " + str(result["code"]))
+        return result["content"]
+
+    def _item(self, channel, number):
         channel_id = str(channel["id"])
         name = str(channel["name"])
         logo_name = LOGO_NAMES.get(channel_id, channel_id.upper())
@@ -242,13 +239,10 @@ class Spider(BaseSpider):
             "name": name,
             "tvgName": name,
             "tvgId": channel_id,
-            "epg": "{}&type=epg&id={}&date={{date}}".format(
-                proxy,
-                quote(channel_id, safe=""),
-            ),
+            "epg": self.proxyUrl({"type": "epg", "id": channel_id}) + "&date={date}",
             "number": "{:02d}".format(number),
             "logo": LOGO_URL.format(quote(logo_name, safe="")),
             "format": HLS_MIME,
             "ua": USER_AGENT,
-            "urls": [proxy + "&id=" + quote(channel_id, safe="")],
+            "urls": [self.proxyUrl({"id": channel_id})],
         }
