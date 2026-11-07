@@ -35,7 +35,7 @@ CHANNEL_ID_RE = re.compile(r"^cctv(?:\d+|5plus|jilu|child|europe|america)$", re.
 
 # Snapshot fallback mirrors ys/cctv.json; the catalogue is tried first.
 FALLBACK_CHANNELS = [
-    ("cctv1", "CCTV-1"), ("cctv2", "CCTV-2 财经"), ("cctv3", "CCTV-3 综艺"),
+    ("cctv1", "CCTV-1 综合"), ("cctv2", "CCTV-2 财经"), ("cctv3", "CCTV-3 综艺"),
     ("cctv4", "CCTV-4 中文国际（亚）"), ("cctv5", "CCTV-5 体育"),
     ("cctv5plus", "CCTV-5+ 体育赛事"), ("cctv6", "CCTV-6 电影"),
     ("cctv7", "CCTV-7 国防军事"), ("cctv8", "CCTV-8 电视剧"),
