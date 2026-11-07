@@ -1,0 +1,23 @@
+{
+  "lives": [
+    {
+      "name": "央视官网（OK影视）",
+      "url": "https://tv.cctv.com/live/",
+      "api": "./cctv_ok.py",
+      "type": 0,
+      "playerType": 1,
+      "timeZone": "Asia/Shanghai",
+      "timeout": 30
+    },
+    {
+      "name": "央视频（OK影视）",
+      "url": "https://capi.yangshipin.cn/api/oms/pc/navigation/home_top_nav",
+      "api": "./yangshipin_ok.py",
+      "ext": "./yangshipin.json",
+      "type": 0,
+      "playerType": 1,
+      "timeZone": "Asia/Shanghai",
+      "timeout": 30
+    }
+  ]
+}
