@@ -763,6 +763,75 @@ def _ensure_channel(ch):
 _LOCAL_PORT = None
 _LOCAL_LOCK = threading.Lock()
 
+def build_all_m3u(port=None):
+    if port is None:
+        try:
+            port = _ensure_local_server()
+        except Exception:
+            port = _LOCAL_PORT
+    if not port:
+        return ""
+
+    out = ["#EXTM3U"]
+    for slug, name, _sid, _pid, _defn in CHANNELS:
+        if slug.startswith("cgtn"):
+            group = "CGTN"
+        elif slug.endswith("ws") or slug in ("cetv1", "guoxue"):
+            group = "卫视频道"
+        else:
+            group = "央视频道"
+
+        out.append(
+            '#EXTINF:-1 tvg-id="%s" tvg-name="%s" group-title="%s",%s'
+            % (slug, name, group, name)
+        )
+        out.append("http://127.0.0.1:%d/%s.m3u8" % (port, slug))
+
+    return "\n".join(out) + "\n"
+
+
+def build_all_txt(port=None):
+    if port is None:
+        try:
+            port = _ensure_local_server()
+        except Exception:
+            port = _LOCAL_PORT
+    if not port:
+        return ""
+
+    groups = {
+        "央视频道": [],
+        "卫视频道": [],
+        "CGTN": [],
+        "4K超清": [],
+        "付费剧场": [],
+        "其他": [],
+    }
+
+    for slug, name, _sid, _pid, _defn in CHANNELS:
+        if slug.startswith("cgtn"):
+            group = "CGTN"
+        elif slug.endswith("ws") or slug == "cetv1":
+            group = "卫视频道"
+        elif slug in TRUE_4K_CHANNELS:
+            group = "4K超清"
+        elif slug in ("cctvfyjc", "cctvdyjc", "cctvhjjc"):
+            group = "付费剧场"
+        elif slug == "guoxue":
+            group = "其他"
+        else:
+            group = "央视频道"
+
+        url = "http://127.0.0.1:%d/%s.m3u8" % (port, slug)
+        groups[group].append("%s,%s" % (name, url))
+
+    lines = []
+    for group in ("央视频道", "卫视频道", "CGTN", "4K超清", "付费剧场", "其他"):
+        if groups[group]:
+            lines.append("%s,#genre#" % group)
+            lines.extend(groups[group])
+
+    return "\n".join(lines) + "\n"
 
 class _LocalHandler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
@@ -794,6 +863,16 @@ class _LocalHandler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         path = urllib.parse.urlparse(self.path).path
+        if path in ("/all.m3u", "/all.txt"):
+            self.send_response(200)
+            ctype = (
+                "application/vnd.apple.mpegurl"
+                if path == "/all.m3u"
+                else "text/plain; charset=utf-8"
+            )
+            self.send_header("Content-Type", ctype)
+            self.end_headers()
+            return
         m = re.match(r'^/([\w]+)\.m3u8$', path)
         if m:
             self.send_response(200)
@@ -833,7 +912,19 @@ class _LocalHandler(BaseHTTPRequestHandler):
             lines.append('logo_source=%s' % (_LOGO_BASE or '(none)'))
             self._send(200, '\n'.join(lines) + '\n')
             return
+        if path == "/all.m3u":
+            self._send(
+                200, build_all_m3u(_LOCAL_PORT),
+                "application/vnd.apple.mpegurl"
+            )
+            return
 
+        if path == "/all.txt":
+            self._send(
+                200, build_all_txt(_LOCAL_PORT),
+                "text/plain; charset=utf-8"
+            )
+            return
         m = re.match(r'^/logo/([\w]+)\.png$', path)
         if m:
             self._serve_logo(m.group(1))
@@ -1204,7 +1295,12 @@ class Spider(SpiderBase):
         return {"page": 1, "pagecount": 1, "limit": len(cards), "total": len(cards), "list": cards}
 
     def action(self, action): return {"msg": "ok"}
-    def liveContent(self): return ""
+    def liveContent(self, url=None):
+        try:
+            port = _ensure_local_server()
+        except Exception:
+            port = _LOCAL_PORT
+        return build_all_m3u(port) if port else ""
     def localProxy(self, params): return [404, "text/plain; charset=utf-8", "Proxy not configured"]
 
 
