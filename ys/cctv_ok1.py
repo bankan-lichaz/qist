@@ -113,7 +113,6 @@ class Spider(BaseSpider):
         try:
             response = self.session.get(target, headers={"Referer": HOST + "/", "User-Agent": UA}, timeout=12)
             response.raise_for_status()
-            response.encoding = response.apparent_encoding
             parser = _LinkParser()
             parser.feed(response.text)
             channels, seen = [], set()
