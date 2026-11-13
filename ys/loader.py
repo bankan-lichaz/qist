@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from base.spider import Spider
+from base.spider import Spider as BaseSpider
 import json as _j
+import re as _re
 
 _q = ["a974149b", "963d21dd", "a4164bcd", "aebd5d8ce362dcb1", "fc434aad", "d1d378a2", "4b4b288c", "ac9c8a6d", "a81b5ebe24d9556d", "d3b56c4af64119e6", "f7d43198"]
 _w = [76, 146, 205, 255, 154, 233, 13, 118, 20, 48, 105]
@@ -10,7 +11,7 @@ _v = ".py"
 
 
 def _g():
-    """Return the built-in AES key used by the original loader config."""
+    """Return the original built-in AES key (32 bytes)."""
     r = [None] * 8
     for a, b, c, d in zip(_q, _w, _m, _f):
         if c < 0:
@@ -35,7 +36,7 @@ def _h():
 
 
 def _key_bytes(value, key_format="hex"):
-    """Parse an AES key supplied in sites[].ext; defaults to raw hex bytes."""
+    """Parse a custom AES key. Hex means raw key bytes, not a passphrase."""
     if isinstance(value, bytes):
         key = value
     else:
@@ -43,7 +44,7 @@ def _key_bytes(value, key_format="hex"):
         mode = str(key_format or "hex").strip().lower()
         if mode in ("hex", "hexadecimal"):
             text = "".join(text.split())
-            if len(text) not in (32, 48, 64) or any(ch not in "0123456789abcdefABCDEF" for ch in text):
+            if len(text) not in (32, 48, 64) or not _re.fullmatch(r"[0-9a-fA-F]+", text):
                 raise ValueError("AES hex key must be 32, 48, or 64 hexadecimal characters")
             key = bytes.fromhex(text)
         elif mode in ("text", "utf8", "utf-8"):
@@ -55,8 +56,9 @@ def _key_bytes(value, key_format="hex"):
     return key
 
 
-class Spider(Spider):
+class Spider(BaseSpider):
     def init(self, extend=""):
+        # ext supports a dict (some runtimes) or a JSON string (legacy sites).
         if isinstance(extend, dict):
             c = extend
         elif extend:
@@ -65,11 +67,14 @@ class Spider(Spider):
             c = {}
         if not isinstance(c, dict):
             raise ValueError("loader ext must be a JSON object")
+
         self._site = str(c.get("site", "")).strip().strip("/")
         self._base = str(c.get("base", "")).rstrip("/")
         self._name = str(c.get("name", ""))
-        # If omitted, remain backward compatible with existing encrypted sites.
+        # Omitted key preserves compatibility with previously encrypted modules.
         self._key = _key_bytes(c.get("key", _g()), c.get("key_format", "hex"))
+        # Passed to the decrypted spider's init(), e.g. D.py list URL/key config.
+        self._module_extend = c.get("module_ext", c.get("moduleExt", ""))
         self._tag = _h()
         self._real = None
 
@@ -78,28 +83,37 @@ class Spider(Spider):
             return self._real
         if not self._base or not self._site:
             raise ValueError("loader ext requires 'base' and 'site'")
+
         import base64
         import requests
         from Crypto.Cipher import AES
 
-        s = requests.Session()
-        s.headers.update({"User-Agent": "okhttp/3.12.0"})
-        r = s.get(self._base + "/" + self._site + _v, timeout=20)
-        r.raise_for_status()
-        d = base64.b64decode(r.content.strip(), validate=True)
-        if len(d) < 32 or (len(d) - 16) % AES.block_size:
+        response = requests.get(
+            self._base + "/" + self._site + _v,
+            timeout=20,
+            headers={"User-Agent": "okhttp/3.12.0"},
+        )
+        response.raise_for_status()
+        payload = base64.b64decode(response.content.strip(), validate=True)
+        if len(payload) < 32 or (len(payload) - 16) % AES.block_size:
             raise ValueError("encrypted module has invalid IV/ciphertext length")
-        iv, ct = d[:16], d[16:]
-        p = AES.new(self._key, AES.MODE_CBC, iv).decrypt(ct)
-        pad = p[-1]
-        if pad < 1 or pad > AES.block_size or p[-pad:] != bytes([pad]) * pad:
+
+        iv, ciphertext = payload[:16], payload[16:]
+        padded = AES.new(self._key, AES.MODE_CBC, iv).decrypt(ciphertext)
+        pad = padded[-1]
+        if pad < 1 or pad > AES.block_size or padded[-pad:] != bytes([pad]) * pad:
             raise ValueError("module decryption failed: wrong key or invalid PKCS#7 padding")
-        code = p[:-pad].decode("utf-8")
-        # Encrypted Python is executable code. Only load modules from a trusted source.
-        ns = {}
-        exec(compile(code, "<s>", "exec"), ns)
-        real = ns["Spider"]()
-        real.init("")
+        code = padded[:-pad].decode("utf-8")
+
+        # This executes downloaded Python. Only use an encrypted module hosted
+        # by a source you control and trust.
+        namespace = {}
+        exec(compile(code, "<encrypted-spider>", "exec"), namespace)
+        spider_class = namespace.get("Spider")
+        if spider_class is None:
+            raise ValueError("encrypted module does not define Spider")
+        real = spider_class()
+        real.init(self._module_extend)
         self._real = real
         return real
 
@@ -112,6 +126,11 @@ class Spider(Spider):
                 self._real.destroy()
             except Exception:
                 pass
+
+    def liveContent(self, url=""):
+        # lives API entry point. Forward the configured lives[].url to the
+        # decrypted module; D.py may alternatively use module_ext.url.
+        return self._load().liveContent(url)
 
     def homeContent(self, filter):
         return self._load().homeContent(filter)
