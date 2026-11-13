@@ -37,7 +37,6 @@ class Spider(BaseSpider):
         return "Decrypt"
 
     def liveContent(self, url=""):
-        """Return the decrypted TXT/M3U body for the OK影视 live-list parser."""
         target = str(url or self.url or "").strip()
         if not target:
             raise ValueError("missing cipher url")
