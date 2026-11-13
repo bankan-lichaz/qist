@@ -6,7 +6,7 @@ from Crypto.Cipher import AES
 
 from base.spider import Spider as BaseSpider
 
-DEFAULT_KEY_HEX = "66d9d037d7497e00362614f746462581e53858d7383a914b9ebd58f104ab8f4b"
+DEFAULT_KEY_HEX = ""
 
 
 class Spider(BaseSpider):
