@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>loader.py 文本加解密工具</title>
+  <style>
+    :root { font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; color: #172033; background: #f3f6fb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px 16px; }
+    main { max-width: 860px; margin: 0 auto; padding: 28px; background: #fff; border: 1px solid #e1e7f0; border-radius: 16px; box-shadow: 0 12px 36px #1d355711; }
+    h1 { margin: 0 0 6px; font-size: 1.65rem; }
+    .intro, .hint { color: #5c667a; }
+    .intro { margin: 0 0 22px; }
+    label { display: block; margin: 16px 0 8px; font-weight: 650; }
+    textarea { display: block; width: 100%; min-height: 190px; resize: vertical; padding: 14px; border: 1px solid #cbd4e1; border-radius: 10px; background: #fbfcfe; color: inherit; font: 14px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    textarea:focus { outline: 3px solid #3b82f633; border-color: #3b82f6; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+    button { border: 0; border-radius: 9px; padding: 10px 16px; font: inherit; font-weight: 650; cursor: pointer; color: white; background: #2563eb; }
+    button.secondary { color: #263248; background: #e8edf5; }
+    button:hover { filter: brightness(.96); }
+    #status { min-height: 1.6em; margin: 8px 0; color: #2563eb; }
+    .hint { margin: 14px 0 0; font-size: .9rem; }
+    .warning { color: #8a4b08; background: #fff7e6; border: 1px solid #f4d28c; border-radius: 9px; padding: 12px 14px; margin-top: 18px; font-size: .9rem; }
+    @media (max-width: 560px) { body { padding: 14px 10px; } main { padding: 18px 14px; } textarea { min-height: 160px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>loader.py 文本加解密工具</h1>
+  <p class="intro">兼容 <code>ys/loader.py</code>：AES-256-CBC，数据格式为 Base64(16 字节随机 IV + 密文)，使用 PKCS#7 填充。</p>
+
+  <label for="input">输入（明文、链接或 Base64 密文）</label>
+  <textarea id="input" placeholder="输入要加密的文本/链接，或粘贴 loader.py 格式的 Base64 密文"></textarea>
+
+  <div class="buttons">
+    <button id="encrypt" type="button">加密 →</button>
+    <button id="decrypt" type="button">← 解密</button>
+    <button id="swap" class="secondary" type="button">交换输入和输出</button>
+    <button id="copy" class="secondary" type="button">复制输出</button>
+    <button id="clear" class="secondary" type="button">清空</button>
+  </div>
+  <div id="status" role="status" aria-live="polite"></div>
+
+  <label for="output">输出</label>
+  <textarea id="output" placeholder="处理结果会显示在这里" readonly></textarea>
+  <p class="hint">每次加密都会生成随机 IV，因此同一段文本的密文通常不同。输出可直接作为 loader.py 获取的 Base64 文件内容。</p>
+  <div class="warning">注意：此工具使用的是 loader.py 中写死的公开密钥，适合兼容该格式或做内容混淆，不适合保护敏感信息。请仅处理你有权访问和使用的内容。</div>
+</main>
+<script>
+'use strict';
+
+// 与 loader.py 的 _g() 逐字节对应，拼接顺序为 _m 指定的 0..7。
+const KEY_HEX = '66d9d077d7497e00362614f73e3e1b7fe53a58d7383a914b9ebd58f104ab8f4b';
+const encoder = new TextEncoder();
+const decoder = new TextDecoder('utf-8', { fatal: true });
+const input = document.getElementById('input');
+const output = document.getElementById('output');
+const status = document.getElementById('status');
+
+function hexToBytes(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return bytes;
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  // 允许普通 Base64 及 URL-safe Base64，并忽略空白/换行。
+  let normalized = value.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  if (!normalized || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) {
+    throw new Error('输入不是有效的 Base64 密文。');
+  }
+  normalized = normalized.replace(/=+$/, '');
+  if (normalized.length % 4 === 1) throw new Error('Base64 密文长度无效。');
+  normalized += '='.repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(normalized);
+  return Uint8Array.from(binary, ch => ch.charCodeAt(0));
+}
+
+async function getKey() {
+  return crypto.subtle.importKey('raw', hexToBytes(KEY_HEX), { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']);
+}
+
+async function encryptText() {
+  const plain = input.value;
+  if (!plain) throw new Error('请先输入要加密的文本或链接。');
+  const iv = crypto.getRandomValues(new Uint8Array(16));
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, await getKey(), encoder.encode(plain)));
+  const payload = new Uint8Array(iv.length + encrypted.length);
+  payload.set(iv, 0);
+  payload.set(encrypted, iv.length);
+  output.value = bytesToBase64(payload);
+  status.textContent = '加密完成。';
+}
+
+async function decryptText() {
+  const payload = base64ToBytes(input.value);
+  if (payload.length < 32 || (payload.length - 16) % 16 !== 0) {
+    throw new Error('密文长度无效：应为 16 字节 IV 加上 16 字节倍数的密文。');
+  }
+  const iv = payload.slice(0, 16);
+  const ciphertext = payload.slice(16);
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, await getKey(), ciphertext);
+  output.value = decoder.decode(plaintext);
+  status.textContent = '解密完成。';
+}
+
+async function run(action) {
+  status.textContent = '';
+  try {
+    await action();
+  } catch (error) {
+    output.value = '';
+    status.textContent = `处理失败：${error.message || '请检查输入内容。'}`;
+  }
+}
+
+document.getElementById('encrypt').addEventListener('click', () => run(encryptText));
+document.getElementById('decrypt').addEventListener('click', () => run(decryptText));
+document.getElementById('swap').addEventListener('click', () => {
+  [input.value, output.value] = [output.value, input.value];
+  status.textContent = '';
+});
+document.getElementById('copy').addEventListener('click', async () => {
+  if (!output.value) { status.textContent = '没有可复制的输出。'; return; }
+  try {
+    await navigator.clipboard.writeText(output.value);
+    status.textContent = '已复制输出。';
+  } catch (_) {
+    output.focus();
+    output.select();
+    status.textContent = '浏览器不允许自动复制，已选中输出，请手动复制。';
+  }
+});
+document.getElementById('clear').addEventListener('click', () => {
+  input.value = '';
+  output.value = '';
+  status.textContent = '';
+});
+</script>
+</body>
+</html>
