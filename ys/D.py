@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Decrypt an AES-CBC encrypted TXT/M3U list for OK影视."""
-
 import base64
 import json
 import re
@@ -10,8 +7,7 @@ from Crypto.Cipher import AES
 
 from base.spider import Spider as BaseSpider
 
-# Exact 32-byte AES key derived from ys/loader.py's _g().
-DEFAULT_KEY_HEX = "66d9d037d7657e00362614f704ab8f4be53858d7383a914b9ebd58f13e3e1b7f"
+DEFAULT_KEY_HEX = ""
 
 
 class Spider(BaseSpider):
