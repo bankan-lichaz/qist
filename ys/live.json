@@ -1754,5 +1754,50 @@
               ]
             }
         ]          
-   }
+   },
+        {
+          "name": "港澳台",
+          "channel": [
+            {
+              "name": "凤凰卫视中文台",
+              "urls": [
+                "http://223.110.245.139/ott.js.chinamobile.com/PLTV/3/224/3221226922/index.m3u8",
+                "http://223.110.245.139/PLTV/3/224/3221226922/index.m3u8",
+                "http://223.110.245.167/ott.js.chinamobile.com/PLTV/3/224/3221226922/index.m3u8"
+              ]
+            },
+            {
+              "name": "凤凰卫视资讯台",
+              "urls": [
+                "http://223.110.245.167/ott.js.chinamobile.com/PLTV/3/224/3221226923/index.m3u8",
+                "http://125.210.152.18:9090/live/FHZX_1200.m3u8",
+                "http://api.mg.itv888.cn:8080/hls/11ef1dc70d8/index.m3u8"
+              ]
+            },
+            {
+              "name": "凤凰卫视香港台",
+              "urls": [
+                "http://223.110.245.136/PLTV/3/224/3221226975/index.m3u8"
+              ]
+            },
+            {
+              "name": "澳门卫视",
+              "urls": [
+                "http://61.244.22.4/ch1/ch1.live/playlist.m3u8"
+              ]
+            },
+            {
+              "name": "TVB新闻",
+              "urls": [
+                "http://r.jdshipin.com/CkuBd"
+              ]
+            },
+            {
+              "name": "星空卫视",
+              "urls": [
+                "http://218.202.220.2:5000/nn_live.ts?id=STARTV"
+              ]
+            }
+          ]
+        }    
 ]
