@@ -14,14 +14,15 @@
     .intro, .hint { color: #5c667a; }
     .intro { margin: 0 0 22px; }
     label { display: block; margin: 16px 0 8px; font-weight: 650; }
-    textarea { display: block; width: 100%; min-height: 190px; resize: vertical; padding: 14px; border: 1px solid #cbd4e1; border-radius: 10px; background: #fbfcfe; color: inherit; font: 14px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
-    textarea:focus { outline: 3px solid #3b82f633; border-color: #3b82f6; }
+    textarea, input, select { display: block; width: 100%; padding: 12px 14px; border: 1px solid #cbd4e1; border-radius: 10px; background: #fbfcfe; color: inherit; font: 14px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    textarea { min-height: 190px; resize: vertical; }
+    textarea:focus, input:focus, select:focus { outline: 3px solid #3b82f633; border-color: #3b82f6; }
     .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
     button { border: 0; border-radius: 9px; padding: 10px 16px; font: inherit; font-weight: 650; cursor: pointer; color: white; background: #2563eb; }
     button.secondary { color: #263248; background: #e8edf5; }
     button:hover { filter: brightness(.96); }
     #status { min-height: 1.6em; margin: 8px 0; color: #2563eb; }
-    .hint { margin: 14px 0 0; font-size: .9rem; }
+    .hint { margin: 8px 0 0; font-size: .9rem; }
     .warning { color: #8a4b08; background: #fff7e6; border: 1px solid #f4d28c; border-radius: 9px; padding: 12px 14px; margin-top: 18px; font-size: .9rem; }
     @media (max-width: 560px) { body { padding: 14px 10px; } main { padding: 18px 14px; } textarea { min-height: 160px; } }
   </style>
@@ -29,10 +30,19 @@
 <body>
 <main>
   <h1>loader.py 文本加解密工具</h1>
-  <p class="intro">兼容 <code>ys/loader.py</code>：AES-256-CBC，数据格式为 Base64(16 字节随机 IV + 密文)，使用 PKCS#7 填充。</p>
+  <p class="intro">AES-CBC 加解密，数据格式为 Base64(16 字节 IV + 密文)，使用 PKCS#7 填充。</p>
+
+  <label for="keyMode">密钥输入格式</label>
+  <select id="keyMode">
+    <option value="hex">十六进制（AES key 原始字节）</option>
+    <option value="text">普通文本（UTF-8 原始字节）</option>
+  </select>
+  <label for="key">自定义 AES 密钥</label>
+  <input id="key" type="text" spellcheck="false" autocomplete="off" value="66d9d037d7497e00362614f73e3e1b7fe53858d7383a914b9ebd58f104ab8f4b" aria-describedby="keyHint">
+  <p id="keyHint" class="hint">默认值是按 ys/loader.py 的 _g() 逻辑计算出的密钥。AES 密钥必须是 16、24 或 32 字节；十六进制格式分别需要 32、48 或 64 个字符。</p>
 
   <label for="input">输入（明文、链接或 Base64 密文）</label>
-  <textarea id="input" placeholder="输入要加密的文本/链接，或粘贴 loader.py 格式的 Base64 密文"></textarea>
+  <textarea id="input" placeholder="输入要加密的文本/链接，或粘贴 Base64(IV + 密文)"></textarea>
 
   <div class="buttons">
     <button id="encrypt" type="button">加密 →</button>
@@ -45,24 +55,38 @@
 
   <label for="output">输出</label>
   <textarea id="output" placeholder="处理结果会显示在这里" readonly></textarea>
-  <p class="hint">每次加密都会生成随机 IV，因此同一段文本的密文通常不同。输出可直接作为 loader.py 获取的 Base64 文件内容。</p>
-  <div class="warning">注意：此工具使用的是 loader.py 中写死的公开密钥，适合兼容该格式或做内容混淆，不适合保护敏感信息。请仅处理你有权访问和使用的内容。</div>
+  <p class="hint">加密时会生成随机 IV。解密时必须使用与加密时完全相同的密钥和格式选项。</p>
+  <div class="warning">注意：loader.py 中的密钥是写在代码里的，并非安全的秘密。此工具仅用于兼容、调试或内容混淆，不适合保护敏感信息。不要把密钥分享给他人。</div>
 </main>
 <script>
 'use strict';
 
-// 与 loader.py 的 _g() 逐字节对应；分段按 _m 的槽位 0..7 拼接。
-// 派生结果：66d9d037 d7437e00 362614f7 3e3e1b7f 4c3858d7 383a914b 9ebd58f1 04ab8f4b
-const KEY_HEX = '66d9d037d7437e00362614f73e3e1b7f4c3858d7383a914b9ebd58f104ab8f4b';
+// 与 loader.py 的 _g() 对应，按 _m 槽位 0..7 拼接后的 32 字节 AES-256 密钥。
+const DEFAULT_KEY_HEX = '66d9d037d7497e00362614f73e3e1b7fe53858d7383a914b9ebd58f104ab8f4b';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
 const input = document.getElementById('input');
 const output = document.getElementById('output');
+const keyInput = document.getElementById('key');
+const keyMode = document.getElementById('keyMode');
 const status = document.getElementById('status');
 
 function hexToBytes(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  const normalized = hex.replace(/\s/g, '');
+  if (!/^(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{48}|[0-9a-fA-F]{64})$/.test(normalized)) {
+    throw new Error('十六进制密钥需为 32、48 或 64 个十六进制字符（对应 16、24 或 32 字节）。');
+  }
+  const bytes = new Uint8Array(normalized.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(normalized.slice(i * 2, i * 2 + 2), 16);
+  return bytes;
+}
+
+function getKeyBytes() {
+  if (keyMode.value === 'hex') return hexToBytes(keyInput.value);
+  const bytes = encoder.encode(keyInput.value);
+  if (![16, 24, 32].includes(bytes.length)) {
+    throw new Error(`文本密钥的 UTF-8 编码长度必须为 16、24 或 32 字节（当前 ${bytes.length} 字节）。`);
+  }
   return bytes;
 }
 
@@ -88,7 +112,7 @@ function base64ToBytes(value) {
 }
 
 async function getKey() {
-  return crypto.subtle.importKey('raw', hexToBytes(KEY_HEX), { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']);
+  return crypto.subtle.importKey('raw', getKeyBytes(), { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']);
 }
 
 async function encryptText() {
