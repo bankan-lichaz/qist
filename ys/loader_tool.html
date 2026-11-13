@@ -51,8 +51,9 @@
 <script>
 'use strict';
 
-// 与 loader.py 的 _g() 逐字节对应，拼接顺序为 _m 指定的 0..7。
-const KEY_HEX = '66d9d077d7497e00362614f73e3e1b7fe53a58d7383a914b9ebd58f104ab8f4b';
+// 与 loader.py 的 _g() 逐字节对应；分段按 _m 的槽位 0..7 拼接。
+// 派生结果：66d9d037 d7437e00 362614f7 3e3e1b7f 4c3858d7 383a914b 9ebd58f1 04ab8f4b
+const KEY_HEX = '66d9d037d7437e00362614f73e3e1b7f4c3858d7383a914b9ebd58f104ab8f4b';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
 const input = document.getElementById('input');
@@ -75,7 +76,6 @@ function bytesToBase64(bytes) {
 }
 
 function base64ToBytes(value) {
-  // 允许普通 Base64 及 URL-safe Base64，并忽略空白/换行。
   let normalized = value.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
   if (!normalized || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) {
     throw new Error('输入不是有效的 Base64 密文。');
