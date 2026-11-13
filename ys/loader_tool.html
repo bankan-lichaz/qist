@@ -31,38 +31,25 @@
 <main>
   <h1>loader.py 文本加解密工具</h1>
   <p class="intro">AES-CBC 加解密，数据格式为 Base64(16 字节 IV + 密文)，使用 PKCS#7 填充。</p>
-
   <label for="keyMode">密钥输入格式</label>
-  <select id="keyMode">
-    <option value="hex">十六进制（AES key 原始字节）</option>
-    <option value="text">普通文本（UTF-8 原始字节）</option>
-  </select>
+  <select id="keyMode"><option value="hex">十六进制（AES key 原始字节）</option><option value="text">普通文本（UTF-8 原始字节）</option></select>
   <label for="key">自定义 AES 密钥</label>
-  <input id="key" type="text" spellcheck="false" autocomplete="off" value="66d9d037d7497e00362614f73e3e1b7fe53858d7383a914b9ebd58f104ab8f4b" aria-describedby="keyHint">
-  <p id="keyHint" class="hint">默认值是按 ys/loader.py 的 _g() 逻辑计算出的密钥。AES 密钥必须是 16、24 或 32 字节；十六进制格式分别需要 32、48 或 64 个字符。</p>
-
+  <input id="key" type="text" spellcheck="false" autocomplete="off" value="66d9d037d7497e00362614f73e3e1b7fe53a58d7383a914b9ebd58f104ab8f4b" aria-describedby="keyHint">
+  <p id="keyHint" class="hint">loader.py 的 key（十六进制）默认值。AES 密钥必须是 16、24 或 32 字节。</p>
   <label for="input">输入（明文、链接或 Base64 密文）</label>
   <textarea id="input" placeholder="输入要加密的文本/链接，或粘贴 Base64(IV + 密文)"></textarea>
-
   <div class="buttons">
-    <button id="encrypt" type="button">加密 →</button>
-    <button id="decrypt" type="button">← 解密</button>
-    <button id="swap" class="secondary" type="button">交换输入和输出</button>
-    <button id="copy" class="secondary" type="button">复制输出</button>
-    <button id="clear" class="secondary" type="button">清空</button>
+    <button id="encrypt" type="button">加密 →</button><button id="decrypt" type="button">← 解密</button>
+    <button id="swap" class="secondary" type="button">交换输入和输出</button><button id="copy" class="secondary" type="button">复制输出</button><button id="clear" class="secondary" type="button">清空</button>
   </div>
   <div id="status" role="status" aria-live="polite"></div>
-
   <label for="output">输出</label>
   <textarea id="output" placeholder="处理结果会显示在这里" readonly></textarea>
-  <p class="hint">加密时会生成随机 IV。解密时必须使用与加密时完全相同的密钥和格式选项。</p>
-  <div class="warning">注意：loader.py 中的密钥是写在代码里的，并非安全的秘密。此工具仅用于兼容、调试或内容混淆，不适合保护敏感信息。不要把密钥分享给他人。</div>
+  <p class="hint">加密会生成随机 IV。OK影视端解密必须使用相同 key、AES-CBC、Base64(IV + 密文) 格式。</p>
+  <div class="warning">注意：代码中写死的 key 不适合保护敏感信息。请仅处理你有权访问和使用的内容。</div>
 </main>
 <script>
 'use strict';
-
-// 与 loader.py 的 _g() 对应，按 _m 槽位 0..7 拼接后的 32 字节 AES-256 密钥。
-const DEFAULT_KEY_HEX = '66d9d037d7497e00362614f73e3e1b7fe53858d7383a914b9ebd58f104ab8f4b';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
 const input = document.getElementById('input');
@@ -70,107 +57,59 @@ const output = document.getElementById('output');
 const keyInput = document.getElementById('key');
 const keyMode = document.getElementById('keyMode');
 const status = document.getElementById('status');
-
 function hexToBytes(hex) {
   const normalized = hex.replace(/\s/g, '');
-  if (!/^(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{48}|[0-9a-fA-F]{64})$/.test(normalized)) {
-    throw new Error('十六进制密钥需为 32、48 或 64 个十六进制字符（对应 16、24 或 32 字节）。');
-  }
+  if (!/^(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{48}|[0-9a-fA-F]{64})$/.test(normalized)) throw new Error('十六进制 key 需为 32、48 或 64 个字符。');
   const bytes = new Uint8Array(normalized.length / 2);
   for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(normalized.slice(i * 2, i * 2 + 2), 16);
   return bytes;
 }
-
 function getKeyBytes() {
   if (keyMode.value === 'hex') return hexToBytes(keyInput.value);
   const bytes = encoder.encode(keyInput.value);
-  if (![16, 24, 32].includes(bytes.length)) {
-    throw new Error(`文本密钥的 UTF-8 编码长度必须为 16、24 或 32 字节（当前 ${bytes.length} 字节）。`);
-  }
+  if (![16, 24, 32].includes(bytes.length)) throw new Error(`文本 key 必须是 16、24 或 32 字节（当前 ${bytes.length} 字节）。`);
   return bytes;
 }
-
 function bytesToBase64(bytes) {
   let binary = '';
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary);
 }
-
 function base64ToBytes(value) {
   let normalized = value.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
-  if (!normalized || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) {
-    throw new Error('输入不是有效的 Base64 密文。');
-  }
+  if (!normalized || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) throw new Error('输入不是有效的 Base64 密文。');
   normalized = normalized.replace(/=+$/, '');
   if (normalized.length % 4 === 1) throw new Error('Base64 密文长度无效。');
   normalized += '='.repeat((4 - normalized.length % 4) % 4);
-  const binary = atob(normalized);
-  return Uint8Array.from(binary, ch => ch.charCodeAt(0));
+  return Uint8Array.from(atob(normalized), ch => ch.charCodeAt(0));
 }
-
-async function getKey() {
-  return crypto.subtle.importKey('raw', getKeyBytes(), { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']);
-}
-
+async function getKey() { return crypto.subtle.importKey('raw', getKeyBytes(), { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']); }
 async function encryptText() {
-  const plain = input.value;
-  if (!plain) throw new Error('请先输入要加密的文本或链接。');
+  if (!input.value) throw new Error('请先输入要加密的文本或链接。');
   const iv = crypto.getRandomValues(new Uint8Array(16));
-  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, await getKey(), encoder.encode(plain)));
-  const payload = new Uint8Array(iv.length + encrypted.length);
-  payload.set(iv, 0);
-  payload.set(encrypted, iv.length);
-  output.value = bytesToBase64(payload);
-  status.textContent = '加密完成。';
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, await getKey(), encoder.encode(input.value)));
+  const payload = new Uint8Array(16 + encrypted.length); payload.set(iv); payload.set(encrypted, 16);
+  output.value = bytesToBase64(payload); status.textContent = '加密完成。';
 }
-
 async function decryptText() {
   const payload = base64ToBytes(input.value);
-  if (payload.length < 32 || (payload.length - 16) % 16 !== 0) {
-    throw new Error('密文长度无效：应为 16 字节 IV 加上 16 字节倍数的密文。');
-  }
-  const iv = payload.slice(0, 16);
-  const ciphertext = payload.slice(16);
-  const plaintext = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, await getKey(), ciphertext);
-  output.value = decoder.decode(plaintext);
-  status.textContent = '解密完成。';
+  if (payload.length < 32 || (payload.length - 16) % 16 !== 0) throw new Error('密文应为 16 字节 IV + 16 字节倍数密文。');
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: payload.slice(0, 16) }, await getKey(), payload.slice(16));
+  output.value = decoder.decode(plaintext); status.textContent = '解密完成。';
 }
-
 async function run(action) {
   status.textContent = '';
-  try {
-    await action();
-  } catch (error) {
-    output.value = '';
-    status.textContent = `处理失败：${error.message || '请检查输入内容。'}`;
-  }
+  try { await action(); } catch (error) { output.value = ''; status.textContent = `处理失败：${error.message || '请检查输入内容。'}`; }
 }
-
 document.getElementById('encrypt').addEventListener('click', () => run(encryptText));
 document.getElementById('decrypt').addEventListener('click', () => run(decryptText));
-document.getElementById('swap').addEventListener('click', () => {
-  [input.value, output.value] = [output.value, input.value];
-  status.textContent = '';
-});
+document.getElementById('swap').addEventListener('click', () => { [input.value, output.value] = [output.value, input.value]; status.textContent = ''; });
 document.getElementById('copy').addEventListener('click', async () => {
   if (!output.value) { status.textContent = '没有可复制的输出。'; return; }
-  try {
-    await navigator.clipboard.writeText(output.value);
-    status.textContent = '已复制输出。';
-  } catch (_) {
-    output.focus();
-    output.select();
-    status.textContent = '浏览器不允许自动复制，已选中输出，请手动复制。';
-  }
+  try { await navigator.clipboard.writeText(output.value); status.textContent = '已复制输出。'; }
+  catch (_) { output.focus(); output.select(); status.textContent = '已选中输出，请手动复制。'; }
 });
-document.getElementById('clear').addEventListener('click', () => {
-  input.value = '';
-  output.value = '';
-  status.textContent = '';
-});
+document.getElementById('clear').addEventListener('click', () => { input.value = ''; output.value = ''; status.textContent = ''; });
 </script>
 </body>
 </html>
