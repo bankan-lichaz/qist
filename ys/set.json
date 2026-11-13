@@ -1,0 +1,14 @@
+ {
+   "sites": [
+    {
+      "key": "heimaodongman",
+      "name": "💕 枫斗二线 💕 ",
+      "type": 3,
+      "api": "https://gh-proxy.com/https://raw.githubusercontent.com/bankan-lichaz/qist/refs/heads/main/ys/loader.py",
+      "ext": "{\"site\": \"heimaodongman\", \"base\": \"https://gh-proxy.com/https://raw.githubusercontent.com/laozheng520/jk/refs/heads/main/enc\", \"name\": \"枫斗二线\"}",
+      "searchable": 1,
+      "quickSearch": 1,
+      "filterable": 1
+    }
+   ]
+}
