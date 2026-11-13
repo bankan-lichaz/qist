@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Decrypt loader.py-compatible AES-CBC live-list payloads for OK影视."""
-
 import base64
 import re
 
@@ -9,20 +6,11 @@ from Crypto.Cipher import AES
 
 from base.spider import Spider as BaseSpider
 
-
-# 32-byte key reconstructed from ys/loader.py's _g() (AES-256).
 DEFAULT_KEY_HEX = "66d9d037d7497e00362614f746462581e53858d7383a914b9ebd58f104ab8f4b"
 
 
 class Spider(BaseSpider):
     def init(self, extend=""):
-        """Accept JSON config or a plain key string in extend.
-
-        JSON example: {"url":"https://example/list.txt", "key":"...",
-                       "key_format":"hex"}.
-        A bare key is auto-detected as hex when it is 32/48/64 hex chars;
-        otherwise it is treated as UTF-8 text.
-        """
         raw = (extend or "").strip()
         config = {}
         if raw.startswith("{"):
@@ -37,7 +25,7 @@ class Spider(BaseSpider):
         self.url = str(config.get("url") or "").strip()
         self.key = str(config.get("key") or (raw if raw and not config else DEFAULT_KEY_HEX)).strip()
         self.key_format = str(config.get("key_format") or config.get("keyFormat") or "auto").strip().lower()
-        # Convenience prefixes are useful when extend is a bare string.
+
         if self.key.startswith("hex:"):
             self.key = self.key[4:].strip()
             self.key_format = "hex"
@@ -128,7 +116,6 @@ class Spider(BaseSpider):
         if not compact or not re.fullmatch(r"[A-Za-z0-9+/=_-]+", compact):
             return original
 
-        # Accept both standard and URL-safe Base64, with optional padding.
         normalized = compact.replace("-", "+").replace("_", "/")
         normalized = normalized.rstrip("=")
         if len(normalized) % 4 == 1:
@@ -140,7 +127,6 @@ class Spider(BaseSpider):
             raise ValueError("invalid Base64 ciphertext") from error
 
         if len(payload) < 32 or (len(payload) - 16) % AES.block_size:
-            # Plain Base64 content that is not this cipher format is passed through.
             return original
 
         iv, ciphertext = payload[:16], payload[16:]
