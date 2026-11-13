@@ -102,12 +102,6 @@ class Spider(BaseSpider):
 
     @staticmethod
     def _try_decrypt(text, decrypt=True, key=None, key_format="auto"):
-        """Decrypt Base64(16-byte IV + AES-CBC/PKCS#7 ciphertext).
-
-        Non-Base64 input is passed through so plain TXT/M3U URLs remain usable.
-        A Base64-looking but malformed payload or a wrong key raises an error
-        instead of silently returning ciphertext as a seemingly valid list.
-        """
         original = str(text or "")
         if not decrypt or not key:
             return original
