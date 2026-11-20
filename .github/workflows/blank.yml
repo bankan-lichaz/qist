@@ -35,6 +35,7 @@ jobs:
           curl -f -L --retry 3 --retry-delay 5 -o jar/pg.jar https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/pg.jar
           curl -f -L --retry 3 --retry-delay 5 -o jar/pg.jar.md5 https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/pg.jar.md5
           # curl -f -L --retry 3 --retry-delay 5 -o jar/pg1.jar https://raw.githubusercontent.com/1697366715/duankou/refs/heads/master/tvbox/PG/pg.jar
+          curl -f -L --retry 3 --retry-delay 5 -o jar/pg1.jar.md5 https://raw.githubusercontent.com/1697366715/duankou/refs/heads/master/tvbox/PG/pg.jar.md5
           # curl -f -L --retry 3 --retry-delay 5 -o jar/pg2.jar https://raw.githubusercontent.com/xzqcsa/ysc/refs/heads/master/xzqzy/lib1/pg桃花.jar
           curl -f -L --retry 3 --retry-delay 5 -o jar/lib/ffmpeg.dyn.tar.xz https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/ffmpeg.dyn.tar.xz
           curl -f -L --retry 3 --retry-delay 5 -o jar/lib/ffmpeg.dyn.tar.xz.md5 https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/ffmpeg.dyn.tar.xz.md5
