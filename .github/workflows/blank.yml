@@ -35,8 +35,10 @@ jobs:
           curl -f -L --retry 3 --retry-delay 5 -o jar/pg.jar https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/pg.jar
           # curl -f -L --retry 3 --retry-delay 5 -o jar/lib/aliproxy.tar.xz https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/aliproxy.tar.xz
           # curl -f -L --retry 3 --retry-delay 5 -o jar/lib/aliproxy.tar.xz.md5 https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/aliproxy.tar.xz.md5
-          # curl -f -L --retry 3 --retry-delay 5 -o jar/lib/allinone.tar.xz https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/allinone.tar.xz
-          # curl -f -L --retry 3 --retry-delay 5 -o jar/lib/aliproxy.tar.xz.md5 https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/aliproxy.tar.xz.md5
+          curl -f -L --retry 3 --retry-delay 5 -o jar/lib/allinone.tar.xz https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/allinone.tar.xz
+          curl -f -L --retry 3 --retry-delay 5 -o jar/lib/aliproxy.tar.xz.md5 https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/aliproxy.tar.xz.md5
+          curl -f -L --retry 3 --retry-delay 5 -o jar/lib/tokenm.json https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/tokenm.json
+          curl -f -L --retry 3 --retry-delay 5 -o jar/lib/douban.json https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/douban.json
 
       # 3. 配置Git提交信息（使用官方机器人账号，不会计入个人提交贡献）
       - name: 配置Git用户信息
