@@ -33,8 +33,8 @@ jobs:
           curl -f -L --retry 3 --retry-delay 5 -o jar/spider.jar https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/spider.jar
           curl -f -L --retry 3 --retry-delay 5 -o jar/fan.txt https://raw.githubusercontent.com/qist/tvbox/refs/heads/master/jar/fan.txt
           curl -f -L --retry 3 --retry-delay 5 -o jar/pg.jar https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/pg.jar
-          # curl -f -L --retry 3 --retry-delay 5 -o jar/lib/aliproxy.tar.xz https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/aliproxy.tar.xz
-          # curl -f -L --retry 3 --retry-delay 5 -o jar/lib/aliproxy.tar.xz.md5 https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/aliproxy.tar.xz.md5
+          curl -f -L --retry 3 --retry-delay 5 -o jar/lib/ffmpeg.dyn.tar.xz https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/ffmpeg.dyn.tar.xz
+          curl -f -L --retry 3 --retry-delay 5 -o jar/lib/ffmpeg.dyn.tar.xz.md5 https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/ffmpeg.dyn.tar.xz.md5
           curl -f -L --retry 3 --retry-delay 5 -o jar/lib/allinone.tar.xz https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/allinone.tar.xz
           curl -f -L --retry 3 --retry-delay 5 -o jar/lib/aliproxy.tar.xz.md5 https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/aliproxy.tar.xz.md5
           curl -f -L --retry 3 --retry-delay 5 -o jar/lib/tokenm.json https://raw.githubusercontent.com/cluntop/tvbox/refs/heads/main/lib/tokenm.json
